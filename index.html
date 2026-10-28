@@ -6,7 +6,7 @@
 :root{
   --paper:#ebe6da; --paper-2:#e2dccd; --ink:#2a2622; --ink-2:#6e665c; --rule:#cfc7b6;
   --c1:#d94f3a; --c2:#e0669a; --c3:#4fae68; --c4:#33306f; --c5:#ee8a3c; --c6:#4f9fae; --c7:#cf9d2a;
-  --accent:#d94f3a;
+  --accent:#e2563f; --panel:#1b1a18; --panel-2:#272523; --panel-3:#34312d; --panel-fg:#ece6da; --panel-dim:#8f8779;
   --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
   --sans:"Zen Kaku Gothic New",-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
 }
@@ -21,30 +21,36 @@ header b{color:var(--ink);font-weight:500}
 canvas{display:block;width:100%;height:100%;touch-action:none}
 #hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--ink-2);font-size:13px;line-height:1.8;padding:24px;pointer-events:none}
 #hint[hidden]{display:none}
-.tray{display:flex;flex-direction:column;gap:10px}
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-button,select{font:inherit;color:var(--ink);background:transparent;border:1px solid var(--ink);border-radius:999px;padding:8px 14px;cursor:pointer;line-height:1}
-button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-button.primary{background:var(--ink);color:var(--paper)}
-button.ghost{border-color:var(--rule);color:var(--ink-2)}
-button:disabled{opacity:.4}
-button.on{background:var(--accent);border-color:var(--accent);color:#fff}
-select{appearance:none;-webkit-appearance:none;padding-right:26px;background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);background-position:right 12px center,right 8px center;background-size:4px 4px,4px 4px;background-repeat:no-repeat}
-.knob{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--ink-2);min-width:0;flex:1 1 140px}
-.knob span{white-space:nowrap}
-input[type=range]{flex:1;min-width:60px;accent-color:var(--accent);height:24px;margin:0}
-#strip{border:1px solid var(--rule);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;background:var(--paper-2)}
+.panel{background:var(--panel);color:var(--panel-fg);border-radius:14px;padding:10px 12px 12px;display:flex;flex-direction:column;gap:10px;box-shadow:0 1px 0 rgba(255,255,255,.04) inset}
+.tabs{display:flex;gap:4px;background:var(--panel-2);border-radius:8px;padding:3px}
+.tab{flex:1;border:0;background:transparent;color:var(--panel-dim);font-family:var(--mono);font-size:11px;letter-spacing:.12em;padding:7px 0;border-radius:6px}
+.tabs .tab.on{background:var(--panel-3);color:var(--panel-fg);border-color:transparent}
+.pane{display:none;flex-direction:column;gap:10px}.pane.on{display:flex}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.panel button,.panel select{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--panel-fg);background:var(--panel-2);border:1px solid var(--panel-3);border-radius:6px;padding:9px 12px;line-height:1;cursor:pointer;box-shadow:0 -1px 0 rgba(255,255,255,.05) inset}
+.panel button:active{transform:translateY(1px)}
+.panel button.primary{background:var(--panel-fg);color:var(--panel);border-color:var(--panel-fg)}
+.panel button.ghost{color:var(--panel-dim)}
+.panel button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.panel button:disabled{opacity:.35}
+.panel button:focus-visible,.panel select:focus-visible,.tab:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.panel select{appearance:none;-webkit-appearance:none;padding-right:24px;background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);background-position:right 11px center,right 7px center;background-size:4px 4px,4px 4px;background-repeat:no-repeat}
+.knob{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--panel-dim);min-width:0;flex:1 1 150px}
+.knob span{white-space:nowrap;min-width:5.5em}
+input[type=range]{flex:1;min-width:60px;accent-color:var(--accent);height:22px;margin:0}
+.lbl{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--panel-dim)}
+#strip{display:flex;flex-direction:column;gap:8px}
 #strip[hidden]{display:none}
 #strip .name{font-family:var(--mono);font-size:11px;letter-spacing:.06em;display:flex;align-items:center;gap:8px}
-#strip .name i{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--c1)}
+#strip .name i{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--c1)}
+#strip-empty{font-family:var(--mono);font-size:11px;color:var(--panel-dim);padding:4px 0}
+#strip-empty[hidden]{display:none}
 #toast{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);background:var(--ink);color:var(--paper);font-size:12px;padding:8px 14px;border-radius:999px;max-width:90%;text-align:center;opacity:0;transition:opacity .25s;pointer-events:none}
 #toast.show{opacity:1}
 /* synth sheet */
-#sheet{position:fixed;inset:0;background:var(--paper);display:flex;flex-direction:column;z-index:20;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-top:calc(env(safe-area-inset-top,0px) + 12px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 12px);box-sizing:border-box;gap:10px}
+#sheet{position:fixed;inset:0;background:var(--paper);display:flex;flex-direction:column;z-index:20;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-top:calc(env(safe-area-inset-top,0px) + 10px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 12px);box-sizing:border-box;gap:10px}
 #sheet[hidden]{display:none}
-#sheet header{border:0}
 #grid{flex:1;min-height:0;width:100%;touch-action:none;border:1px solid var(--rule);border-radius:12px;display:block}
-.sheet-row{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
@@ -60,71 +66,88 @@ input[type=range]{flex:1;min-width:60px;accent-color:var(--accent);height:24px;m
     <div id="toast"></div>
   </div>
 
-  <div class="tray">
-    <div id="strip" hidden>
-      <div class="name"><i id="s-dot"></i><span id="s-name">—</span><span id="s-len" style="margin-left:auto"></span></div>
+  <div class="panel">
+    <div class="tabs" role="tablist">
+      <button class="tab on" data-tab="src">音源</button><button class="tab" data-tab="tape">テープ</button><button class="tab" data-tab="char">質感</button><button class="tab" data-tab="out">出力</button>
+    </div>
+
+    <section class="pane on" data-pane="src">
       <div class="row">
-        <button id="b-flip">裏返す</button>
-        <button id="b-half">半分に切る</button>
-        <button id="b-full" class="ghost">元の長さ</button>
-        <button id="b-oct-dn" class="ghost">8va↓</button><button id="b-oct-up" class="ghost">8va↑</button>
-        <button id="b-del" class="ghost" style="margin-left:auto">消す</button>
+        <button id="b-first" class="primary">はじめの一手</button>
+        <button id="b-rec">● 録音</button>
+        <button id="b-file">ファイル</button>
+        <button id="b-synth">グリッド</button>
+        <select id="sel-tex" aria-label="テクスチャ"><option value="">テクスチャ</option><option value="rain">雨</option><option value="needle">レコードの針</option><option value="wind">風</option><option value="hum">ハム</option></select>
+        <input id="f-file" type="file" hidden>
+        <video id="vx" playsinline hidden></video>
+      </div>
+    </section>
+
+    <section class="pane" data-pane="tape">
+      <div id="strip-empty">列をタップで選択 · 2回タップでミュート</div>
+      <div id="strip" hidden>
+        <div class="name"><i id="s-dot"></i><span id="s-name">—</span><span id="s-len" style="margin-left:auto;color:var(--panel-dim)"></span></div>
+        <div class="row">
+          <button id="b-flip">裏返す</button>
+          <button id="b-half">半分</button>
+          <button id="b-full" class="ghost">元の長さ</button>
+          <button id="b-oct-dn">8va↓</button><button id="b-oct-up">8va↑</button>
+          <button id="b-del" class="ghost" style="margin-left:auto">消す</button>
+        </div>
+        <div class="row">
+          <label class="knob"><span>速さ</span><input id="k-rate" type="range" min="-3" max="3" step="0.01" value="0"></label>
+          <label class="knob"><span>濃さ</span><input id="k-gain" type="range" min="0" max="1" step="0.01" value="0.8"></label>
+          <label class="knob"><span>奥行き</span><input id="k-depth" type="range" min="0" max="1" step="0.01" value="0.2"></label>
+        </div>
       </div>
       <div class="row">
-        <label class="knob"><span>速さ</span><input id="k-rate" type="range" min="-3" max="3" step="0.01" value="0"></label>
-        <label class="knob"><span>濃さ</span><input id="k-gain" type="range" min="0" max="1" step="0.01" value="0.8"></label>
-        <label class="knob"><span>奥行き</span><input id="k-depth" type="range" min="0" max="1" step="0.01" value="0.2"></label>
+        <button id="b-shake" class="ghost">すこし揺らす</button>
+        <button id="b-play" class="ghost">停止</button>
       </div>
-    </div>
+    </section>
 
-    <div class="row">
-      <button id="b-first">はじめの一手</button>
-      <button id="b-rec" class="primary">● 録音</button>
-      <button id="b-file">ファイル</button>
-      <button id="b-synth">シンセ</button>
-      <select id="sel-tex" aria-label="テクスチャ"><option value="">テクスチャ</option><option value="rain">雨</option><option value="needle">レコードの針</option><option value="wind">風</option><option value="hum">ハム</option></select>
-      <input id="f-file" type="file" hidden>
-      <video id="vx" playsinline hidden></video>
-    </div>
+    <section class="pane" data-pane="char">
+      <div class="row">
+        <select id="sel-char" aria-label="質感">
+          <option value="cassette">カセット</option><option value="dust">ダスト</option><option value="water">水の中</option><option value="room">隣の部屋</option><option value="radio">壊れたラジオ</option><option value="space">宇宙</option><option value="glass">ガラス</option><option value="clean">きれい</option>
+        </select>
+        <label class="knob"><span>深さ</span><input id="k-char" type="range" min="0" max="1" step="0.01" value="0.7"></label>
+      </div>
+      <div class="row">
+        <label class="knob"><span>リバーブ</span><input id="k-hall" type="range" min="0" max="1" step="0.01" value="0"></label>
+        <label class="knob"><span>エコー</span><input id="k-echo" type="range" min="0" max="1" step="0.01" value="0"></label>
+        <label class="knob"><span>きらめき</span><input id="k-shim" type="range" min="0" max="1" step="0.01" value="0"></label>
+      </div>
+    </section>
 
-    <div class="row">
-      <select id="sel-char" aria-label="質感">
-        <option value="cassette">カセット</option><option value="dust">ダスト</option><option value="water">水の中</option><option value="room">隣の部屋</option><option value="radio">壊れたラジオ</option><option value="space">宇宙</option><option value="glass">ガラス</option><option value="clean">きれい</option>
-      </select>
-      <label class="knob"><span>深さ</span><input id="k-char" type="range" min="0" max="1" step="0.01" value="0.7"></label>
-      <button id="b-shake" class="ghost">すこし揺らす</button>
-      <button id="b-play" class="ghost">停止</button>
-    </div>
-
-    <div class="row">
-      <label class="knob"><span>めちゃリバーブ</span><input id="k-hall" type="range" min="0" max="1" step="0.01" value="0"></label>
-      <label class="knob"><span>エコー</span><input id="k-echo" type="range" min="0" max="1" step="0.01" value="0"></label>
-      <label class="knob"><span>きらめき</span><input id="k-shim" type="range" min="0" max="1" step="0.01" value="0"></label>
-    </div>
-
-    <div class="row">
-      <span style="font-family:var(--mono);font-size:11px;color:var(--ink-2)">書き出し</span>
-      <button id="x15" class="ghost">15s</button><button id="x30" class="ghost">30s</button><button id="x60" class="ghost">60s</button>
-      <span style="font-family:var(--mono);font-size:11px;color:var(--ink-2);margin-left:6px">物語で</span>
-      <button id="s30" class="ghost">30s</button><button id="s60" class="ghost">60s</button>
-      <span id="x-status" style="font-family:var(--mono);font-size:11px;color:var(--ink-2)"></span>
-    </div>
+    <section class="pane" data-pane="out">
+      <div class="row">
+        <span class="lbl">そのまま</span>
+        <button id="x15">15s</button><button id="x30">30s</button><button id="x60">60s</button>
+        <span class="lbl" style="margin-left:8px">物語で</span>
+        <button id="s30" class="primary">30s</button><button id="s60" class="primary">60s</button>
+        <span id="x-status" class="lbl" style="margin-left:auto"></span>
+      </div>
+    </section>
   </div>
 </div>
 
 <div id="sheet" hidden>
-  <header><div><b>グリッド</b> · 押す=鳴る · 長押し=焼き付け · 離す=テープ</div><button id="b-sheet-close" class="ghost">閉じる</button></header>
+  <header><div><b>グリッド</b> · 押す=鳴る · 長押し=焼き付け · 離す=テープ</div><div id="seq-pos">—</div></header>
   <canvas id="grid"></canvas>
-  <div class="sheet-row">
-    <select id="sel-scale" aria-label="スケール"><option value="dorian">ドリアン</option><option value="penta">ペンタ</option><option value="hira">平調子</option><option value="whole">全音</option></select>
-    <label class="knob"><span>ゆらぎ</span><input id="k-syn-wob" type="range" min="0" max="1" step="0.01" value="0.4"></label>
-    <label class="knob"><span>立ち上がり</span><input id="k-syn-att" type="range" min="0.02" max="3" step="0.01" value="0.8"></label>
-    <label class="knob"><span>歩幅</span><input id="k-step" type="range" min="0.12" max="1.2" step="0.01" value="0.4"></label>
-  </div>
-  <div class="sheet-row">
-    <button id="b-run">走らせる</button>
-    <button id="b-seq-tape" class="primary">1周をテープに</button>
-    <button id="b-seq-clear" class="ghost">焼き付けを消す</button>
+  <div class="panel">
+    <div class="row">
+      <select id="sel-scale" aria-label="スケール"><option value="dorian">ドリアン</option><option value="penta">ペンタ</option><option value="hira">平調子</option><option value="whole">全音</option></select>
+      <label class="knob"><span>ゆらぎ</span><input id="k-syn-wob" type="range" min="0" max="1" step="0.01" value="0.3"></label>
+      <label class="knob"><span>立ち上がり</span><input id="k-syn-att" type="range" min="0.02" max="3" step="0.01" value="0.6"></label>
+      <label class="knob"><span>歩幅</span><input id="k-step" type="range" min="0.12" max="1.2" step="0.01" value="0.4"></label>
+    </div>
+    <div class="row">
+      <button id="b-run">走らせる</button>
+      <button id="b-seq-tape" class="primary">1周をテープに</button>
+      <button id="b-seq-clear" class="ghost">焼き付けを消す</button>
+      <button id="b-sheet-close" style="margin-left:auto">机へ戻る</button>
+    </div>
   </div>
 </div>
 
@@ -136,6 +159,9 @@ const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim
 let ac=null, master=null, strips=[], selected=null, colorIdx=0, playing=true;
 let charName='cassette', charDepth=0.7;
 
+/* ---------- tabs ---------- */
+function showTab(name){ document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.tab===name)); document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===name)); }
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>showTab(t.dataset.tab));
 /* ---------- toast ---------- */
 let toastT; function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600);}
 
@@ -263,16 +289,16 @@ function mkSource(s){
   else { src.buffer=s.buf; src.loopStart=0; src.loopEnd=s.loopEnd; }
   src.loop=true; return src;
 }
-function startStrip(s){
-  stopStrip(s); if(!playing) return;
-  const src=mkSource(s); src.playbackRate.value=s.rate; src.connect(s.g); src.start(0,src.loopStart); s.src=src;
-  const gh=mkSource(s); gh.playbackRate.value=Math.min(16,s.rate*2); gh.connect(s.shim); gh.start(0,gh.loopStart); s.ghost=gh;   // octave-up shadow for shimmer
-  s.phase=0; s.lastT=performance.now();
+function startStrip(s,when){
+  stopStrip(s); if(!playing) return; when=when||0;
+  const src=mkSource(s); src.playbackRate.value=s.rate; src.connect(s.g); src.start(when,src.loopStart); s.src=src;
+  const gh=mkSource(s); gh.playbackRate.value=Math.min(16,s.rate*2); gh.connect(s.shim); gh.start(when,gh.loopStart); s.ghost=gh;   // octave-up shadow for shimmer
+  s.phase=0; s.lastT=performance.now()+(when?Math.max(0,when-ac.currentTime)*1000:0);
 }
 function stopStrip(s){ for(const k of ['src','ghost']){ if(s[k]){try{s[k].stop();}catch(e){} s[k].disconnect(); s[k]=null;} } }
 function removeStrip(s){ stopStrip(s); s.g.disconnect(); s.shim.disconnect(); strips=strips.filter(x=>x!==s); if(selected===s) select(null); if(!strips.length) $('#hint').hidden=false; applyChar(); }
 function select(s){
-  selected=s; const p=$('#strip'); p.hidden=!s; if(!s) return;
+  selected=s; const p=$('#strip'); p.hidden=!s; $('#strip-empty').hidden=!!s; if(!s) return;
   $('#s-dot').style.background=`var(${s.color})`; $('#s-name').textContent=s.name; $('#s-len').textContent=fmtLen(s);
   $('#k-rate').value=Math.log2(s.rate); $('#k-gain').value=s.gain; $('#k-depth').value=s.depth;
   $('#b-flip').classList.toggle('on',s.rev);
@@ -403,7 +429,7 @@ async function renderGesture(g){ const last=Math.max(...g.events.map(ev=>ev.off|
 // sequencer: walks the 8 columns, plays every baked cell in the column
 function seqTick(){ if(!seq.on) return; const step=+$('#k-step').value; seq.step=(seq.step+1)%N; const dest=synthDest();
   for(let r=0;r<N;r++){ const bk=baked[seq.step][r]; if(bk){ const v=buildVoice(ac,{...bk,wob:+$('#k-syn-wob').value,att:Math.min(+$('#k-syn-att').value,step*0.8)},dest,step*1.7); } }
-  seq.timer=setTimeout(seqTick,step*1000); }
+  $('#seq-pos').textContent=String(seq.step+1).padStart(2,'0')+' / 08'; seq.timer=setTimeout(seqTick,step*1000); }
 $('#b-run').onclick=()=>{ seq.on=!seq.on; $('#b-run').textContent=seq.on?'止める':'走らせる'; $('#b-run').classList.toggle('on',seq.on); clearTimeout(seq.timer); if(seq.on){seq.step=-1;seqTick();} else seq.step=-1; };
 $('#b-seq-clear').onclick=()=>{ for(const col of baked) col.fill(null); toast('焼き付けを消しました'); };
 $('#b-seq-tape').onclick=async()=>{ ensureAudio(); const step=+$('#k-step').value, cells=[]; baked.forEach((col,c)=>col.forEach((bk,r)=>{if(bk)cells.push({c,bk});})); if(!cells.length){toast('先に長押しでマスを焼き付けてください');return;}
@@ -433,23 +459,24 @@ $('#b-sheet-close').onclick=()=>{$('#sheet').hidden=true;};
 /* ---------- はじめの一手: floor + air + dots, in tune and in time, so the user only adds the "event" ---------- */
 async function renderVoices(items,total){ const sr=ac.sampleRate, off=new OfflineAudioContext(1,Math.floor(sr*total),sr); for(const it of items) buildVoice(off,it.spec,off.destination,it.dur,it.t0||0); return off.startRendering(); }
 async function firstMove(){
-  ensureAudio(); const btn=$('#b-first'); btn.disabled=true; toast('床・空気・点を置いています…');
-  const chars=['space','glass','cassette']; charName=chars[Math.floor(Math.random()*chars.length)]; $('#sel-char').value=charName; $('#sel-char').onchange({target:$('#sel-char')});
-  const wob=+$('#k-syn-wob').value, root=Math.floor(Math.random()*3);
-  // floor: one deep note, slowed an octave
-  const fl=await renderVoices([{spec:{freq:colFreq(root),layer:0,bright:0.35,det:0,wob:wob*0.5,att:1.5},dur:6}],6.5);
-  const s1=addStrip(fl,'床'); s1.rate=0.5; s1.gain=0.9; s1.depth=0.15; setStripParams(s1);
-  // air: a triad on the scale, reversed, slowed, far away
-  const tri=[root,root+2,root+4].map(c=>c%8);
-  const air=await renderVoices(tri.map((c,i)=>({spec:{freq:colFreq(c),layer:0.33,bright:0.5,det:(i-1)*6,wob,att:2},dur:8,t0:i*0.4})),9.5);
-  const s2=addStrip(air,'空気'); s2.rev=true; s2.rate=0.7; s2.gain=0.7; s2.depth=0.7; setStripParams(s2); startStrip(s2);
-  // dots: bake 3-4 bell cells and render one sequence pass, an octave up
+  ensureAudio(); const btn=$('#b-first'); btn.disabled=true; toast('床・空気・点を、同じ歩幅で置いています…');
+  charName='cassette'; $('#sel-char').value='cassette'; applyChar(); $('#k-hall').value=0.3; $('#k-echo').value=0.15; $('#k-shim').value=0.2; applySpace();
+  const step=+$('#k-step').value, bar=step*N, root=Math.floor(Math.random()*3), wob=0.15;
+  // 床: a bass pulse on steps 1 and 5 (and a soft pickup on 8) — one bar loop
+  const bass=[0,4,7].map((st,i)=>({spec:{freq:colFreq(root),layer:0.1,bright:0.55,det:0,wob,att:0.05},dur:i<2?step*3.2:step*0.9,t0:st*step}));
+  const s1=addStrip(await renderVoices(bass,bar+1.2),'床'); s1.loopEnd=bar; s1.gain=0.8; s1.depth=0.1; setStripParams(s1); startStrip(s1);
+  // 空気: a pad chord held for a bar, changing once — two-bar loop
+  const chords=[[root,root+2,root+4],[root+3,root+5,root+7]].map(ch=>ch.map(c=>Math.min(N-1,c)));
+  const pad=[]; chords.forEach((ch,b2)=>ch.forEach((c,i)=>pad.push({spec:{freq:colFreq(c),layer:0.4,bright:0.5,det:0,wob,att:step*1.5},dur:bar*0.95,t0:b2*bar+i*0.05})));
+  const s2=addStrip(await renderVoices(pad,bar*2+1.5),'空気'); s2.loopEnd=bar*2; s2.gain=0.5; s2.depth=0.55; setStripParams(s2); startStrip(s2);
+  // 点: bake 3–4 bell cells in the grid and render one pass — one bar loop, so it locks to the bass
   for(const col of baked) col.fill(null);
   const cols=[...Array(N).keys()].sort(()=>Math.random()-0.5).slice(0,3+Math.floor(Math.random()*2));
-  for(const c of cols){ const r=5+Math.floor(Math.random()*2); baked[c][r]={freq:colFreq(c),layer:r/(N-1),bright:0.5+Math.random()*0.4,det:0}; }
-  const step=+$('#k-step').value, items=[]; baked.forEach((col,c)=>col.forEach(bk=>{ if(bk) items.push({spec:{...bk,wob,att:Math.min(0.8,step*0.8)},dur:step*1.7,t0:c*step}); }));
-  const seq=await renderVoices(items,step*N+1.6); const s3=addStrip(seq,'点'); s3.loopEnd=step*N; s3.rate=2; s3.gain=0.45; s3.depth=0.4; setStripParams(s3); startStrip(s3);
-  select(null); btn.disabled=false; toast('床・空気・点を置きました。あとは「事件」を1本 — 録音かファイルを足してみてください');
+  for(const c of cols){ const r=5+Math.floor(Math.random()*2); baked[c][r]={freq:colFreq(c),layer:r/(N-1),bright:0.55+Math.random()*0.3,det:0}; }
+  const items=[]; baked.forEach((col,c)=>col.forEach(bk=>{ if(bk) items.push({spec:{...bk,wob,att:0.02},dur:step*1.7,t0:c*step}); }));
+  const s3=addStrip(await renderVoices(items,bar+1.6),'点'); s3.loopEnd=bar; s3.gain=0.4; s3.depth=0.3; setStripParams(s3); startStrip(s3);
+  const t0=ac.currentTime+0.08; for(const x of [s1,s2,s3]) startStrip(x,t0);   // start together so the loops stay locked
+  select(null); btn.disabled=false; toast('床・空気・点を置きました。「事件」を1本 — 録音かファイルを足してみてください');
 }
 $('#b-first').onclick=()=>firstMove().catch(e=>{ $('#b-first').disabled=false; toast('うまく置けませんでした: '+(e&&e.message||'')); });
 
@@ -516,7 +543,7 @@ function draw(now){
     for(let c=0;c<cells;c++){
       const idx=s.rev?(Math.floor(s.buf.duration/cell)-1-c):c; const a=s.env[idx]||0; if(a<0.06) continue;
       const y=top+(s.rev?len-(c+.5)*cellPx:(c+.5)*cellPx); // reversed prints upward
-      const passed=c<=headCell, r=Math.max(1,Math.min(colW*0.42,a*a*colW*0.55*(0.4+s.gain*0.8)));
+      const passed=c<=headCell, r=Math.max(1,Math.min(colW*0.26,a*a*colW*0.4*(0.4+s.gain*0.8)));
       const prev=s.env[s.rev?idx+1:idx-1]||0, onset=(a-prev)>0.12||c===0;      // a dot marks an onset; sustained sound prints as a thin line
       g2.fillStyle=color; g2.globalAlpha=(passed?0.95:0.18)*mutedA;
       if(onset){ g2.beginPath(); g2.arc(cx,y,r*0.9,0,6.283); g2.fill(); }
@@ -541,7 +568,7 @@ requestAnimationFrame(draw);
 let lastTap={s:null,t:0};
 cv.addEventListener('pointerdown',e=>{ const x=e.offsetX; const hit=layout.find(l=>x>=l.x&&x<l.x+l.w); const s=hit?hit.s:null; const now=performance.now();
   if(s&&lastTap.s===s&&now-lastTap.t<350){ s.muted=!s.muted; setStripParams(s); toast(s.muted?s.name+' を止めました':s.name+' を戻しました'); }
-  lastTap={s,t:now}; select(s); });
+  lastTap={s,t:now}; select(s); if(s) showTab('tape'); });
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&ac&&ac.state!=='running') ac.resume(); });
 })();
 </script>
