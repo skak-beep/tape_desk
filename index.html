@@ -56,7 +56,7 @@ input[type=range]{flex:1;min-width:60px;accent-color:var(--accent);height:24px;m
 
   <div id="stage">
     <canvas id="cv"></canvas>
-    <div id="hint">音を置くと、ここに点が刷られていきます。<br>下から 録音 / ファイル / シンセ / テクスチャ</div>
+    <div id="hint">音を置くと、ここに点が刷られていきます。<br>下から 録音 / ファイル / シンセ / テクスチャ<br><small>列を2回タップでミュート。書き出し中に出し入れすると曲になります</small></div>
     <div id="toast"></div>
   </div>
 
@@ -105,6 +105,8 @@ input[type=range]{flex:1;min-width:60px;accent-color:var(--accent);height:24px;m
     <div class="row">
       <span style="font-family:var(--mono);font-size:11px;color:var(--ink-2)">書き出し</span>
       <button id="x15" class="ghost">15s</button><button id="x30" class="ghost">30s</button><button id="x60" class="ghost">60s</button>
+      <span style="font-family:var(--mono);font-size:11px;color:var(--ink-2);margin-left:6px">物語で</span>
+      <button id="s30" class="ghost">30s</button><button id="s60" class="ghost">60s</button>
       <span id="x-status" style="font-family:var(--mono);font-size:11px;color:var(--ink-2)"></span>
     </div>
   </div>
@@ -240,7 +242,7 @@ function reverseBuf(buf){
 function addStrip(buf,name){
   ensureAudio();
   const s={id:Date.now()+Math.random(),name,buf,rbuf:null,env:envelope(buf),color:COLORS[colorIdx++%COLORS.length],
-    rate:1,gain:0.8,depth:0.2,rev:false,loopEnd:buf.duration,src:null,ghost:null,g:null,lp:null,send:null,shim:null,phase:0,startedAt:0,born:performance.now()};
+    rate:1,gain:0.8,depth:0.2,muted:false,rev:false,loopEnd:buf.duration,src:null,ghost:null,g:null,lp:null,send:null,shim:null,phase:0,startedAt:0,born:performance.now()};
   s.g=ac.createGain(); s.lp=ac.createBiquadFilter(); s.lp.type='lowpass'; s.send=ac.createGain(); s.shim=ac.createGain(); s.shim.gain.value=0;
   s.g.connect(s.lp).connect(master.g); s.lp.connect(s.send).connect(master.rev); s.shim.connect(master.hall);
   strips.push(s); setStripParams(s); startStrip(s); select(s); $('#hint').hidden=true; applyChar();
@@ -248,7 +250,7 @@ function addStrip(buf,name){
 }
 function setStripParams(s){
   const t=ac.currentTime;
-  s.g.gain.setTargetAtTime(s.gain*0.7,t,0.03);
+  if(!s.auto) s.g.gain.setTargetAtTime(s.muted?0:s.gain*0.7,t,0.08);
   s.lp.frequency.setTargetAtTime(Math.exp(Math.log(12000)+(Math.log(500)-Math.log(12000))*s.depth),t,0.05);
   s.send.gain.setTargetAtTime(s.depth*1.2,t,0.05);
   if(s.src) s.src.playbackRate.setTargetAtTime(s.rate,t,0.05);
@@ -466,6 +468,25 @@ async function exportSec(sec){
   rec.start(); setTimeout(()=>rec.stop(),sec*1000);
 }
 $('#x15').onclick=()=>exportSec(15); $('#x30').onclick=()=>exportSec(30); $('#x60').onclick=()=>exportSec(60);
+/* 物語: an arc borrowed from short ambient pieces — enter one by one, swell, a brief event, leave in reverse, reverb tail */
+function story(sec){
+  if(!master||!strips.length){toast('先に音を置いてください');return;}
+  const t=ac.currentTime, order=[...strips].sort((a,b)=>a.born-b.born), n=order.length, lead=0.2;
+  const g=(s)=>s.muted?0:s.gain*0.7;
+  order.forEach((s,i)=>{ s.auto=true; const p=s.g.gain; p.cancelScheduledValues(t); p.setValueAtTime(0,t);
+    let last=t; const at=x=>{ last=Math.max(last+0.01,x); return last; }, set=(v,x)=>p.setValueAtTime(v,at(x)), ramp=(v,x)=>p.linearRampToValueAtTime(v,at(x)), G=g(s);
+    const tin=t+lead+sec*0.55*(i/n), fade=Math.min(4,sec*0.12), swell=t+sec*0.42, ev=t+sec*0.66, tout=t+sec*(0.78+0.2*((n-1-i)/n));
+    ramp(G,tin+fade);                                              // enter
+    set(G,swell-2); ramp(G*1.25,swell+1.5); ramp(G*0.85,swell+4);  // first swell
+    if(i===n-1){ set(G*0.85,ev-0.5); ramp(G*1.6,ev+0.4); ramp(G*0.6,ev+3); }   // newest strip is the "event"
+    else { set(G*0.85,ev-0.5); ramp(G*0.45,ev+0.6); ramp(G*0.9,ev+3.5); }       // the others duck under it
+    set(G*0.9,tout-3); ramp(0,tout+Math.min(3,sec*0.08));          // leave, in reverse order
+  });
+  const h=master.hallIn.gain, h0=h.value; h.setValueAtTime(h0,t+sec*0.7); h.linearRampToValueAtTime(Math.max(h0,0.9),t+sec*0.95);    // reverb opens up at the end
+  setTimeout(()=>{ for(const s of order){ s.auto=false; setStripParams(s); } h.setTargetAtTime(h0,ac.currentTime,0.5); },sec*1000+1800);
+  exportSec(sec+2);
+}
+$('#s30').onclick=()=>story(30); $('#s60').onclick=()=>story(60);
 
 /* ---------- drawing: punch-card columns ---------- */
 const cv=$('#cv'), g2=cv.getContext('2d'); let W=0,H=0,DPR=1, t0=performance.now();
@@ -486,7 +507,7 @@ function draw(now){
   strips.forEach((s,i)=>{
     // advance phase
     if(s.src&&playing){ const dt=(now-(s.lastT||now))/1000; s.phase=(s.phase+dt*s.rate)%s.loopEnd; } s.lastT=now;
-    const color=css(s.color), cx=x0+colW*i+colW/2, len=(s.loopEnd/s.rate)*pxPerSec, cell=0.05, cells=Math.floor(s.loopEnd/cell), cellPx=len/cells;
+    const color=css(s.color), cx=x0+colW*i+colW/2, mutedA=s.muted?0.25:1, len=(s.loopEnd/s.rate)*pxPerSec, cell=0.05, cells=Math.floor(s.loopEnd/cell), cellPx=len/cells;
     layout.push({s,x:x0+colW*i,w:colW});
     // spine
     g2.strokeStyle=color; g2.globalAlpha=s===selected?0.9:0.35; g2.lineWidth=1; g2.beginPath(); g2.moveTo(cx+.5,top); g2.lineTo(cx+.5,top+len); g2.stroke();
@@ -497,7 +518,7 @@ function draw(now){
       const y=top+(s.rev?len-(c+.5)*cellPx:(c+.5)*cellPx); // reversed prints upward
       const passed=c<=headCell, r=Math.max(1,Math.min(colW*0.42,a*a*colW*0.55*(0.4+s.gain*0.8)));
       const prev=s.env[s.rev?idx+1:idx-1]||0, onset=(a-prev)>0.12||c===0;      // a dot marks an onset; sustained sound prints as a thin line
-      g2.fillStyle=color; g2.globalAlpha=passed?0.95:0.18;
+      g2.fillStyle=color; g2.globalAlpha=(passed?0.95:0.18)*mutedA;
       if(onset){ g2.beginPath(); g2.arc(cx,y,r*0.9,0,6.283); g2.fill(); }
       else { const w=Math.max(1,a*colW*0.14); g2.fillRect(cx-w/2,y-cellPx*0.5,w,Math.max(1,cellPx)+0.5); }
     }
@@ -517,7 +538,10 @@ function draw(now){
 }
 const fmtClock=ms=>{const s=Math.floor(ms/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');};
 requestAnimationFrame(draw);
-cv.addEventListener('pointerdown',e=>{ const x=e.offsetX; const hit=layout.find(l=>x>=l.x&&x<l.x+l.w); select(hit?hit.s:null); });
+let lastTap={s:null,t:0};
+cv.addEventListener('pointerdown',e=>{ const x=e.offsetX; const hit=layout.find(l=>x>=l.x&&x<l.x+l.w); const s=hit?hit.s:null; const now=performance.now();
+  if(s&&lastTap.s===s&&now-lastTap.t<350){ s.muted=!s.muted; setStripParams(s); toast(s.muted?s.name+' を止めました':s.name+' を戻しました'); }
+  lastTap={s,t:now}; select(s); });
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&ac&&ac.state!=='running') ac.resume(); });
 })();
 </script>
