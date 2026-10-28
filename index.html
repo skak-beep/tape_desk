@@ -78,6 +78,7 @@ input[type=range]{flex:1;min-width:60px;accent-color:var(--accent);height:24px;m
     </div>
 
     <div class="row">
+      <button id="b-first">はじめの一手</button>
       <button id="b-rec" class="primary">● 録音</button>
       <button id="b-file">ファイル</button>
       <button id="b-synth">シンセ</button>
@@ -427,6 +428,29 @@ requestAnimationFrame(drawGrid);
 $('#b-synth').onclick=()=>{ensureAudio();$('#sheet').hidden=false;requestAnimationFrame(gridResize);};
 $('#b-sheet-close').onclick=()=>{$('#sheet').hidden=true;};
 
+/* ---------- はじめの一手: floor + air + dots, in tune and in time, so the user only adds the "event" ---------- */
+async function renderVoices(items,total){ const sr=ac.sampleRate, off=new OfflineAudioContext(1,Math.floor(sr*total),sr); for(const it of items) buildVoice(off,it.spec,off.destination,it.dur,it.t0||0); return off.startRendering(); }
+async function firstMove(){
+  ensureAudio(); const btn=$('#b-first'); btn.disabled=true; toast('床・空気・点を置いています…');
+  const chars=['space','glass','cassette']; charName=chars[Math.floor(Math.random()*chars.length)]; $('#sel-char').value=charName; $('#sel-char').onchange({target:$('#sel-char')});
+  const wob=+$('#k-syn-wob').value, root=Math.floor(Math.random()*3);
+  // floor: one deep note, slowed an octave
+  const fl=await renderVoices([{spec:{freq:colFreq(root),layer:0,bright:0.35,det:0,wob:wob*0.5,att:1.5},dur:6}],6.5);
+  const s1=addStrip(fl,'床'); s1.rate=0.5; s1.gain=0.9; s1.depth=0.15; setStripParams(s1);
+  // air: a triad on the scale, reversed, slowed, far away
+  const tri=[root,root+2,root+4].map(c=>c%8);
+  const air=await renderVoices(tri.map((c,i)=>({spec:{freq:colFreq(c),layer:0.33,bright:0.5,det:(i-1)*6,wob,att:2},dur:8,t0:i*0.4})),9.5);
+  const s2=addStrip(air,'空気'); s2.rev=true; s2.rate=0.7; s2.gain=0.7; s2.depth=0.7; setStripParams(s2); startStrip(s2);
+  // dots: bake 3-4 bell cells and render one sequence pass, an octave up
+  for(const col of baked) col.fill(null);
+  const cols=[...Array(N).keys()].sort(()=>Math.random()-0.5).slice(0,3+Math.floor(Math.random()*2));
+  for(const c of cols){ const r=5+Math.floor(Math.random()*2); baked[c][r]={freq:colFreq(c),layer:r/(N-1),bright:0.5+Math.random()*0.4,det:0}; }
+  const step=+$('#k-step').value, items=[]; baked.forEach((col,c)=>col.forEach(bk=>{ if(bk) items.push({spec:{...bk,wob,att:Math.min(0.8,step*0.8)},dur:step*1.7,t0:c*step}); }));
+  const seq=await renderVoices(items,step*N+1.6); const s3=addStrip(seq,'点'); s3.loopEnd=step*N; s3.rate=2; s3.gain=0.45; s3.depth=0.4; setStripParams(s3); startStrip(s3);
+  select(null); btn.disabled=false; toast('床・空気・点を置きました。あとは「事件」を1本 — 録音かファイルを足してみてください');
+}
+$('#b-first').onclick=()=>firstMove().catch(e=>{ $('#b-first').disabled=false; toast('うまく置けませんでした: '+(e&&e.message||'')); });
+
 /* ---------- export ---------- */
 let dl=null; (async()=>{ try{ dl=await (window.claude?.use?.('downloads')); }catch(e){} })();
 async function exportSec(sec){
@@ -472,9 +496,10 @@ function draw(now){
       const idx=s.rev?(Math.floor(s.buf.duration/cell)-1-c):c; const a=s.env[idx]||0; if(a<0.06) continue;
       const y=top+(s.rev?len-(c+.5)*cellPx:(c+.5)*cellPx); // reversed prints upward
       const passed=c<=headCell, r=Math.max(1,Math.min(colW*0.42,a*a*colW*0.55*(0.4+s.gain*0.8)));
+      const prev=s.env[s.rev?idx+1:idx-1]||0, onset=(a-prev)>0.12||c===0;      // a dot marks an onset; sustained sound prints as a thin line
       g2.fillStyle=color; g2.globalAlpha=passed?0.95:0.18;
-      if(a>0.55&&passed){ g2.fillRect(cx-r,y-cellPx*0.45,r*2,Math.max(1,cellPx*0.9)); } // loud = bar
-      else { g2.beginPath(); g2.arc(cx,y,r*0.9,0,6.283); g2.fill(); }
+      if(onset){ g2.beginPath(); g2.arc(cx,y,r*0.9,0,6.283); g2.fill(); }
+      else { const w=Math.max(1,a*colW*0.14); g2.fillRect(cx-w/2,y-cellPx*0.5,w,Math.max(1,cellPx)+0.5); }
     }
     // playhead tick
     const hy=top+(s.rev?len-s.phase/s.loopEnd*len:s.phase/s.loopEnd*len);
