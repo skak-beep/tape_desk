@@ -13,6 +13,8 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--mono);font-
 .tabs{display:flex;gap:14px;color:var(--dim)} .tabs span{cursor:pointer;padding:4px 0} .tabs span.on{color:var(--fg);border-bottom:1px solid var(--acc)}
 .top .r{margin-left:auto;color:var(--dim);font-size:11px;white-space:nowrap} .top .r b{color:var(--fg);font-weight:500} .top .r b.rec{color:var(--rec)}
 #stack{width:100%;height:70px;display:block;border:1px solid var(--line)}
+.recbar{display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:5;background:var(--bg);padding:4px 0} .recbar .rl{display:flex;gap:3px} .recbar .rl button{min-height:36px;padding:8px 9px;font-size:11px} .recbar #b-rec-top{min-height:40px;padding:8px 14px} .recbar .lbl{margin-left:auto;font-size:11px;color:var(--fg);white-space:nowrap;text-align:right} .recbar .lbl.rec{color:var(--rec)} .recbar .lbl.cnt{color:var(--acc);font-size:16px;font-weight:600}
+#glide.rec{border-color:var(--rec);box-shadow:0 0 0 1px var(--rec) inset}
 .pane{display:none;flex-direction:column;gap:10px}.pane.on{display:flex}
 .sets{display:flex;gap:5px} .sets button{flex:1;padding:10px 2px;min-height:40px;font-size:12px}
 /* grid: 8 rows, each = name | rate | 16 steps */
@@ -78,6 +80,11 @@ input[type=range]{flex:1;min-width:60px;accent-color:var(--acc);height:28px;marg
   <canvas id="stack"></canvas>
 
   <section class="pane on" data-pane="make">
+    <div class="recbar">
+      <button id="b-rec-top" class="recbtn">● Rec</button>
+      <span class="rl"><button data-rl="4">4</button><button data-rl="8" class="on">8</button><button data-rl="15">15</button><button data-rl="30">30</button><button data-rl="0">∞</button></span>
+      <span id="rec-status" class="lbl">READY</span>
+    </div>
     <div class="sets" id="sets"></div>
     <div class="grid" id="grid"></div>
     <canvas id="arena" hidden></canvas>
@@ -131,11 +138,7 @@ input[type=range]{flex:1;min-width:60px;accent-color:var(--acc);height:28px;marg
       <div class="knob" data-k="rate" data-min="40" data-max="200" data-v="120"><div class="k">120</div>BPM</div>
       <div class="knob" data-k="vol" data-min="0" data-max="100" data-v="85"><div class="k">85</div>Vol</div>
     </div>
-    <div class="row">
-      <span class="lbl">長さ</span><button data-rl="4">4s</button><button data-rl="8" class="on">8s</button><button data-rl="15">15s</button><button data-rl="30">30s</button><button data-rl="0">∞</button>
-      <button id="b-auto" style="margin-left:auto">降らす</button>
-    </div>
-    <div class="row"><button id="b-rec" class="big recbtn">● Rec phrase</button><button id="b-micclip">● Mic phrase</button></div>
+    <div class="row"><button id="b-rec" class="big recbtn">● Rec phrase</button><button id="b-micclip">● Mic phrase</button><button id="b-auto">降らす</button></div>
   </section>
 
   
@@ -191,7 +194,7 @@ const wakeEl=document.getElementById('wake'); let needRebuild=false;
 const wakeTap=()=>{ if(needRebuild){ rebuildAudio(); needRebuild=false; } unlock(); setTimeout(()=>{ if(ac&&ac.state==='running') wakeEl.hidden=true; },150); setTimeout(()=>{ if(ac&&ac.state==='running') wakeEl.hidden=true; else { needRebuild=true; wakeEl.querySelector('div').innerHTML='<b>構成</b><br>もう一度タップ(エンジンを作り直します)'; } },800); };
 wakeEl.addEventListener('touchend',wakeTap,{passive:true}); wakeEl.addEventListener('click',wakeTap);
 /* iOS interrupts the engine when the app goes to the background; coming back it may be suspended, or 'running' but frozen. Detect both and ask for one tap to rebuild. */
-function rebuildAudio(){ try{ if(ac) ac.close(); }catch(e){} ac=null; M=null; proc=null; capNode=null; capSink=null; noiseB=null; bendable.clear(); glPointers.clear(); heldNames.clear(); if(typeof tlPlaying!=='undefined'&&tlPlaying){ playing_nodes=[]; tlPlaying=false; $('#t-play').textContent='▶ Play'; $('#t-play').classList.remove('on'); } if(seq.on) runSeq(false); recording=false; $('#b-rec').classList.remove('on'); $('#b-rec').textContent='● Rec phrase'; ensureAudio(); applyDrive(); toast('音のエンジンを作り直しました'); }
+function rebuildAudio(){ try{ if(ac) ac.close(); }catch(e){} ac=null; M=null; proc=null; capNode=null; capSink=null; noiseB=null; bendable.clear(); glPointers.clear(); heldNames.clear(); if(typeof tlPlaying!=='undefined'&&tlPlaying){ playing_nodes=[]; tlPlaying=false; $('#t-play').textContent='▶ Play'; $('#t-play').classList.remove('on'); } if(seq.on) runSeq(false); recording=false; setRecUI(false); ensureAudio(); applyDrive(); toast('音のエンジンを作り直しました'); }
 let lastCT=-1, stuck=0; setInterval(()=>{ if(!ac) return; if(document.hidden) return; if(ac.state!=='running'){ ac.resume(); stuck++; } else if(ac.currentTime===lastCT){ stuck++; } else stuck=0; lastCT=ac.currentTime; if(stuck>=3&&wakeEl.hidden){ needRebuild=true; wakeEl.querySelector('div').innerHTML='<b>構成</b><br>タップして音を起こす<br><small>画面を離れていたので、音のエンジンが止まりました</small>'; wakeEl.hidden=false; } },500);
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&ac){ lastCT=-1; stuck=0; ac.resume(); } });
 let toastT; const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600);};
@@ -507,6 +510,7 @@ function drawGlide(){ if(!GW) glResize(); if(!GW||$('#glide').hidden) return; gg
   gg.fillStyle='#0e0e0f'; gg.fillRect(fx0,0,fxW(),GH); gg.strokeStyle=line; gg.strokeRect(fx0+0.5,0.5,fxW()-1,GH-1); gg.fillStyle=dim; for(let y=12;y<GH;y+=12) for(let x=fx0+10;x<GW-6;x+=12){ gg.beginPath(); gg.arc(x,y,0.7,0,6.283); gg.fill(); }
   gg.strokeStyle=dim; gg.setLineDash([2,4]); gg.beginPath(); gg.moveTo(fx0,GH/2+0.5); gg.lineTo(GW,GH/2+0.5); gg.stroke(); gg.setLineDash([]);
   gg.fillStyle=dim; gg.font='9px '+css('--mono'); gg.textAlign='center'; gg.fillText('+12',fx0+fxW()/2,10); gg.fillText('−12',fx0+fxW()/2,GH-8); gg.save(); gg.translate(fx0+8,GH/2); gg.rotate(-Math.PI/2); gg.fillText('BEND ↕ · TONE ↔',0,0); gg.restore();
+  if(recording&&ac){ gg.fillStyle=css('--rec'); gg.font='600 12px '+css('--mono'); gg.textAlign='left'; gg.textBaseline='top'; gg.fillText('● '+Math.max(0,ac.currentTime-recStart).toFixed(1)+'s'+(recLen?' / '+recLen:''),8,6); }
   if(randMode){ gg.strokeStyle=acc; gg.globalAlpha=0.35; gg.setLineDash([3,5]); gg.strokeRect(1.5,1.5,fx0-3,GH-3); gg.setLineDash([]); gg.globalAlpha=1; for(const st of glPointers.values()) if(st.rand){ gg.fillStyle=acc; gg.beginPath(); gg.arc(st.rx,st.ry,8,0,6.283); gg.fill(); gg.font='9px '+css('--mono'); gg.fillStyle=dim; gg.textAlign='left'; gg.fillText('↕ 高さ  ↔ 速さ',st.rx+12,st.ry-10); } }
   if(glFxPos){ const px=fx0+glFxPos.u*fxW(), py=(1-glFxPos.vv)*GH; gg.fillStyle=acc; gg.beginPath(); gg.arc(px,py,7,0,6.283); gg.fill(); gg.strokeStyle=acc; gg.globalAlpha=0.4; gg.beginPath(); gg.arc(px,py,14,0,6.283); gg.stroke(); gg.globalAlpha=1; } }
 
@@ -542,14 +546,19 @@ document.querySelectorAll('.knob').forEach(el=>{ const k=el.dataset.k, mn=+el.da
 /* ---------- phrase capture (linear, sample-accurate) ---------- */
 let recording=false, recL=null, recR=null, recStart=0, recLen=8, recIdx=0, recMax=0;
 function onCapture(e){ if(!recording||!recL) return; const inL=e.inputBuffer.getChannelData(0), inR=e.inputBuffer.numberOfChannels>1?e.inputBuffer.getChannelData(1):inL; const n=inL.length; let idx=Math.floor((e.playbackTime-recStart)*ac.sampleRate); if(idx<0){ const skip=-idx; idx=0; for(let i=skip;i<n;i++){ if(idx>=recMax) break; recL[idx]=inL[i]; recR[idx]=inR[i]; idx++; } } else { for(let i=0;i<n;i++){ if(idx>=recMax) break; recL[idx]=inL[i]; recR[idx]=inR[i]; idx++; } } recIdx=Math.max(recIdx,idx); if(recIdx>=recMax) rec(false); }
-document.querySelectorAll('[data-rl]').forEach(b=>b.onclick=()=>{ recLen=+b.dataset.rl; document.querySelectorAll('[data-rl]').forEach(x=>x.classList.toggle('on',x===b)); });
-function rec(on){ ensureAudio(); if(on===recording) return; recording=on; $('#b-rec').classList.toggle('on',on); $('#b-rec').textContent=on?'■ Stop':'● Rec phrase';
+document.querySelectorAll('[data-rl]').forEach(b=>b.onclick=()=>{ recLen=+b.dataset.rl; document.querySelectorAll('[data-rl]').forEach(x=>x.classList.toggle('on',+x.dataset.rl===recLen)); });
+let countTimer=null, counting=false;
+function setRecUI(on){ for(const id of ['#b-rec','#b-rec-top']){ const b=$(id); b.classList.toggle('on',on); } $('#b-rec').textContent=on?'■ Stop':'● Rec phrase'; $('#b-rec-top').textContent=on?'■ Stop':'● Rec'; $('#glide').classList.toggle('rec',on); }
+function recWithCount(){ ensureAudio(); if(recording){ rec(false); return; } if(counting){ clearTimeout(countTimer); counting=false; $('#rec-status').textContent='READY'; $('#rec-status').className='lbl'; return; }
+  counting=true; let n=3; const st=$('#rec-status'); const tick=()=>{ if(!counting) return; if(n>0){ st.textContent=String(n); st.className='lbl cnt'; noise({hp:2500,len:0.01,gain:0.25,pan:0},PP()); n--; countTimer=setTimeout(tick,600); } else { counting=false; rec(true); } }; tick(); }
+$('#b-rec-top').onclick=recWithCount;
+function rec(on){ ensureAudio(); if(on===recording) return; recording=on; setRecUI(on);
   if(on){ recMax=Math.floor((recLen||120)*ac.sampleRate); recL=new Float32Array(recMax); recR=new Float32Array(recMax); recIdx=0; recStart=ac.currentTime+0.05; capOn(true); toast(recLen?recLen+'秒 録音中':'録音中(■で止める)'); return; }
   capOn(false);
   if(recL){ const n=Math.max(1,recIdx); let peak=0; for(let i=0;i<n;i+=53) peak=Math.max(peak,Math.abs(recL[i]),Math.abs(recR[i])); if(peak<0.003||n<ac.sampleRate*0.2){ toast('何も鳴らなかったので、フレーズは作りませんでした'); recL=recR=null; return; }
     const buf=ac.createBuffer(2,n,ac.sampleRate); buf.copyToChannel(recL.subarray(0,n),0); buf.copyToChannel(recR.subarray(0,n),1); recL=recR=null; addClip(buf,curSet==='glide'?instr.name:SETS[curSet].name); } }
 function capOn(on){ if(!ac) return; if(capNode){ capNode.port.postMessage({on}); return; } if(on){ if(!proc){ proc=ac.createScriptProcessor(2048,2,1); proc.onaudioprocess=onCapture; } M.pre.connect(proc); proc.connect(capSink); } else if(proc){ try{ M.pre.disconnect(proc); proc.disconnect(); }catch(e){} } }
-$('#b-rec').onclick=()=>rec(!recording);
+$('#b-rec').onclick=recWithCount;
 let micRec=null; $('#b-micclip').onclick=async()=>{ ensureAudio(); if(micRec){ micRec.stop(); return; } if(!navigator.mediaDevices?.getUserMedia){ toast('マイクが使えない環境です'); return; }
   try{ const st=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}}); const ch=[]; micRec=new MediaRecorder(st); micRec.ondataavailable=ev=>{if(ev.data.size)ch.push(ev.data);};
     micRec.onstop=async()=>{ st.getTracks().forEach(x=>x.stop()); const blob=new Blob(ch,{type:micRec.mimeType}); micRec=null; $('#b-micclip').classList.remove('on'); $('#b-micclip').textContent='● Mic phrase'; try{ addClip(await ac.decodeAudioData(await blob.arrayBuffer()),'マイク'); }catch(e){ toast('録音を読み込めませんでした'); } };
@@ -603,6 +612,7 @@ function drawTL(){ if(!document.querySelector('.pane[data-pane="tl"]').classList
   const hx=xOf(tlPos()); tg.fillStyle=fg; tg.fillRect(hx-0.5,0,1.5,TH); tg.fillStyle=acc; tg.beginPath(); tg.moveTo(hx-5,0); tg.lineTo(hx+5,0); tg.lineTo(hx,7); tg.fill();
   if(tlPlaying){ const p=tlPos(); if(p>=tlLen){ if(tlLoop){ head=0; tlPlay(false); tlPlay(true); } else { tlPlay(false); head=0; } } }
   $('#r-pos').textContent=tlPos().toFixed(1).padStart(4,'0'); }
+setInterval(()=>{ const st=$('#rec-status'); if(counting) return; if(recording&&ac){ const el=Math.max(0,ac.currentTime-recStart); st.textContent='● '+el.toFixed(1)+(recLen?'/'+recLen:'')+'s'; st.className='lbl rec'; } else { st.textContent=recLen?recLen+'s':'∞'; st.className='lbl'; } },100);
 // pointer interaction: tap = head / select; drag clip = move; drag edge = trim
 let drag=null;
 tl.addEventListener('pointerdown',e=>{ ensureAudio(); tl.setPointerCapture(e.pointerId); const r=tl.getBoundingClientRect(); const x=e.clientX-r.left, y=e.clientY-r.top; const t=tOf(x); const lane=Math.floor((y-RULER)/LANE_H);
