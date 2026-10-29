@@ -34,7 +34,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--mono);font-
 .pad{height:52px;border:1px solid var(--line);border-radius:4px;background:var(--bg-2);touch-action:none;cursor:pointer;display:flex;align-items:flex-end;padding:5px;box-sizing:border-box;font-size:10px;position:relative}
 .pad.sel{border-color:var(--acc);color:var(--acc)} .pad.lit{background:#2a1a10}
 /* arena */
-#arena{width:100%;height:220px;display:block;border:1px solid var(--line);touch-action:none} #arena[hidden],#arena-row[hidden],#grid[hidden],.pane[hidden]{display:none!important}
+#arena{width:100%;height:220px;display:block;border:1px solid var(--line);touch-action:none} #glide{width:100%;height:330px;display:block;border:1px solid var(--line);touch-action:none;background:var(--bg)} #glide[hidden],#glide-row[hidden]{display:none!important} #arena[hidden],#arena-row[hidden],#grid[hidden],.pane[hidden]{display:none!important}
 .fx{display:grid;grid-template-columns:repeat(4,1fr);gap:6px} .fx button{min-height:46px;font-size:11px;touch-action:none;padding:8px 4px}
 .fx button small{display:block;color:var(--dim);font-size:9px;margin-top:3px} .fx button.hold{background:var(--acc);border-color:var(--acc);color:#0a0a0b} .fx button.hold small{color:#3a2412}
 .knobs{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
@@ -80,6 +80,8 @@ input[type=range]{flex:1;min-width:60px;accent-color:var(--acc);height:28px;marg
     <div class="sets" id="sets"></div>
     <div class="grid" id="grid"></div>
     <canvas id="arena" hidden></canvas>
+    <canvas id="glide" hidden></canvas>
+    <div class="row" id="glide-row" hidden><span class="lbl">Scale</span><button id="gl-scale">ペンタ</button><span class="lbl" style="margin-left:6px">Voice</span><button id="gl-voice">Pluck</button><span class="lbl" style="margin-left:auto;text-transform:none">なぞる=連打 · 止める=膨らむ · 右の帯=2本目の指(上下=ピッチ、左右=明るさ/歪み)</span></div>
     <div class="row" id="arena-row" hidden><span class="lbl">Balls</span><button id="a-bm">−</button><button id="a-balls">4</button><button id="a-bp">+</button><button id="a-shape">Oct</button><button id="a-grav">Grav 60</button><button id="a-kick">Kick</button></div>
     <div class="lbl" id="arena-help" hidden style="text-transform:none">▶ Run で玉が動き、壁に当たると鳴ります。壁の音=下の8行。行を選んで Edit → Source で、どのセットのどの音を壁にするか選べます。</div>
     <div class="row">
@@ -167,7 +169,7 @@ document.querySelectorAll('.tabs span').forEach(t=>t.onclick=()=>{document.query
 const KEYS=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; let key=0; const hz=m=>440*Math.pow(2,(m-69)/12), root=()=>48+key;
 const P={dark:50,rev:60,tape:50,decay:100,rate:120,vol:70}; const dec=()=>P.decay/100;
 let loopLen=30, loopStart=0, playing=false, layers=[], sample=null, sampleRev=null, curSet='tone', autoOn=false;
-const PP=()=>({pitch:0,tone:0.5,decay:1,cut:1,level:1,pan:0,rev:1,vel:0.7,reverse:false,clean:false,voice:'bell'});
+const PP=()=>({pitch:0,tone:0.5,decay:1,cut:1,level:1,pan:0,rev:1,vel:0.7,reverse:false,clean:false,voice:'bell',glide:false});
 
 /* ---------- audio ---------- */
 let ac=null, M=null, proc=null, noiseB=null;
@@ -176,18 +178,19 @@ function ensureAudio(){ if(ac){ if(ac.state!=='running') ac.resume(); return ac;
   const padSum=ac.createGain(), stIn=ac.createGain(), stD=ac.createDelay(1), stFb=ac.createGain(); stD.delayTime.value=0.0625; stFb.gain.value=0; const cleanSum=ac.createGain(), clp=ac.createBiquadFilter(); clp.type='lowpass'; clp.Q.value=0.5;
   const lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.Q.value=0.7; const sat=ac.createWaveShaper(); sat.oversample='2x'; const wow=ac.createDelay(0.05); wow.delayTime.value=0.006; const lfo=ac.createOscillator(); lfo.frequency.value=0.45; const lfoG=ac.createGain(); lfoG.gain.value=0.0008; lfo.connect(lfoG).connect(wow.delayTime); lfo.start();
   const rev=ac.createConvolver(); rev.buffer=mkIR(5); const revIn=ac.createGain(), revG=ac.createGain(); const pre=ac.createGain();
-  padSum.connect(stIn).connect(stD); stD.connect(stFb).connect(stD); stD.connect(lp).connect(wow).connect(sat).connect(pre); cleanSum.connect(clp).connect(pre); revIn.connect(rev); rev.connect(revG).connect(clp);
+  const mixB=ac.createGain(), glideSum=ac.createGain(), gdrive=ac.createWaveShaper(), glp=ac.createBiquadFilter(); glp.type='lowpass'; glp.frequency.value=6000; gdrive.curve=new Float32Array([-1,0,1]); gdrive.oversample='2x';
+  padSum.connect(lp).connect(wow).connect(sat).connect(mixB); cleanSum.connect(clp).connect(mixB); glideSum.connect(gdrive).connect(glp).connect(cleanSum); mixB.connect(stIn).connect(stD); stD.connect(stFb).connect(stD); stD.connect(pre); revIn.connect(rev); rev.connect(revG).connect(clp);
   const layBus=ac.createGain(), master=ac.createGain(), comp=ac.createDynamicsCompressor(); comp.threshold.value=-14; comp.ratio.value=3; comp.knee.value=10; const out=ac.createGain(); const tap=ac.createMediaStreamDestination();
   pre.connect(master); layBus.connect(master); master.connect(comp).connect(out); out.connect(ac.destination); out.connect(tap);
   proc=ac.createScriptProcessor(2048,2,1); const sink=ac.createGain(); sink.gain.value=0; pre.connect(proc); proc.connect(sink).connect(ac.destination); proc.onaudioprocess=onCapture;
-  M={padSum,cleanSum,clp,stIn,stD,stFb,lp,sat,lfoG,revIn,revG,pre,layBus,master,out,tap}; applyKnobs(); return ac; }
+  M={padSum,cleanSum,clp,glideSum,gdrive,glp,stIn,stD,stFb,lp,sat,lfoG,revIn,revG,pre,layBus,master,out,tap}; applyKnobs(); return ac; }
 function mkNoise(sec){ const n=Math.floor(ac.sampleRate*sec), b=ac.createBuffer(1,n,ac.sampleRate), d=b.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; return b; }
 function mkIR(sec){ const n=Math.floor(ac.sampleRate*sec), b=ac.createBuffer(2,n,ac.sampleRate); for(let c=0;c<2;c++){const d=b.getChannelData(c);let l=0;for(let i=0;i<n;i++){const w=Math.random()*2-1;l=0.82*l+0.18*w;d[i]=l*Math.pow(1-i/n,3.4)*1.4;}} return b; }
 function satCurve(a){ const n=1024,c=new Float32Array(n),k=a*20+1; for(let i=0;i<n;i++){const x=i*2/n-1;c[i]=(1+k)*x/(1+k*Math.abs(x));} return c; }
 function applyKnobs(){ if(!M) return; const t=ac.currentTime; const d=P.dark/100; if(!fx.dive&&!fx.stop){ M.lp.frequency.setTargetAtTime(16000*Math.pow(0.08,d),t,0.1); M.clp.frequency.setTargetAtTime(20000*Math.pow(0.12,d),t,0.1); }
   M.revG.gain.setTargetAtTime(Math.pow(P.rev/100,1.2)*1.4,t,0.1); M.sat.curve=satCurve(0.05+P.tape/100*0.5); M.lfoG.gain.setTargetAtTime(P.tape/100*0.0016,t,0.1); M.out.gain.setTargetAtTime(P.vol/100*1.1,t,0.05); }
 /* every voice ends in gate(): pan + per-pad reverse envelope + abrupt cut */
-function gate(t,dur,pp,pn){ const g=ac.createGain(), p=ac.createStereoPanner?ac.createStereoPanner():ac.createGain(); if(p.pan) p.pan.value=Math.max(-1,Math.min(1,pn+pp.pan)); g.connect(p).connect(pp.clean?M.cleanSum:M.padSum);
+function gate(t,dur,pp,pn){ const g=ac.createGain(), p=ac.createStereoPanner?ac.createStereoPanner():ac.createGain(); if(p.pan) p.pan.value=Math.max(-1,Math.min(1,pn+pp.pan)); g.connect(p).connect(pp.glide?M.glideSum:pp.clean?M.cleanSum:M.padSum);
   if(pp.reverse){ const end=t+Math.max(0.08,dur*0.85); g.gain.setValueAtTime(0.03,t); g.gain.exponentialRampToValueAtTime(1.7,end); g.gain.setValueAtTime(0,end+0.004); } else g.gain.setValueAtTime(1,t);
   if(pp.cut<1){ const ct=t+0.012+pp.cut*pp.cut*0.9; g.gain.setValueAtTime(g.gain.value,ct); g.gain.setValueAtTime(0,ct+0.001); } return g; }
 function revSend(node,amt){ const r=ac.createGain(); r.gain.value=amt; node.connect(r).connect(M.revIn); }
@@ -204,12 +207,19 @@ function tone(semi,v,pn,pp,at){ pp=pp||PP(); const t=at||ac.currentTime, f=hz(ro
     chime: {p:[[1,1,0,0],[2.4,0.4,0,1.2],[3.1,0.25,0,0.9],[4.7,0.1,0,0.5]],att:0.005,dur:2.8+v},
     pad:   {p:[[1,1,-3,0],[1,0.8,3,0],[2,0.15,0,0],[0.5,0.3,0,0]],att:0.6,dur:2.5+v*2},
     breath:{p:[[1,1,0,0],[1,0.4,5,0],[2,0.1,0,0]],att:0.9,dur:3+v*2},
-    subbell:{p:[[0.5,1,0,0],[1,0.6,0,0],[2,0.2,0,0.8],[3,0.08,0,0.3]],att:0.01,dur:3.5+v*1.5} }[kind]||null;
+    subbell:{p:[[0.5,1,0,0],[1,0.6,0,0],[2,0.2,0,0.8],[3,0.08,0,0.3]],att:0.01,dur:3.5+v*1.5},
+    pluck: {p:[[1,1,0,0],[2,0.22,0,0.09],[3,0.07,0,0.05]],att:0.004,dur:0.32+v*0.3} }[kind]||null;
   const spec=V||{p:[[1,1,0,0]],att:0.01,dur:2}; const dur=spec.dur*dec()*pp.decay, out=gate(t,dur,pp,pn), g=ac.createGain(); const lvl=(kind==='pad'||kind==='breath'?0.22:0.3)*(0.4+v*0.6)*pp.level;
   g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(lvl,t+spec.att); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-  const bright=0.3+pp.tone*1.2; for(const [mul,gain,det,dc] of spec.p){ const gg=gain*(mul>1?bright:1); if(gg<0.004) continue; const o=ac.createOscillator(); o.type='sine'; o.frequency.value=f*mul; o.detune.value=det; const og=ac.createGain(); og.gain.setValueAtTime(gg,t); if(dc) og.gain.setTargetAtTime(0.0001,t+spec.att,dc*dec()); o.connect(og).connect(g); o.start(t); o.stop(t+dur+0.1); }
+  const bright=0.3+pp.tone*1.2; for(const [mul,gain,det,dc] of spec.p){ const gg=gain*(mul>1?bright:1); if(gg<0.004) continue; const o=ac.createOscillator(); o.type='sine'; o.frequency.value=f*mul; o.detune.value=det+(pp.glide?bend*100:0); const og=ac.createGain(); og.gain.setValueAtTime(gg,t); if(dc) og.gain.setTargetAtTime(0.0001,t+spec.att,dc*dec()); o.connect(og).connect(g); o.start(t); o.stop(t+dur+0.1); if(pp.glide){ bendable.add({o,det}); o.onended=()=>{ for(const b of bendable) if(b.o===o) bendable.delete(b); }; } }
   if(kind==='breath'){ const n=ac.createBufferSource(); n.buffer=noiseB; n.loop=true; const bp=ac.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=f*2; bp.Q.value=6; const ng=ac.createGain(); ng.gain.value=0.25; n.connect(bp).connect(ng).connect(g); n.start(t); n.stop(t+dur+0.1); }
   g.connect(out); revSend(g,1.4*pp.rev); }
+let bend=0; const bendable=new Set();
+function setBend(semi){ bend=semi; const t=ac.currentTime; for(const b of bendable) b.o.detune.setTargetAtTime(b.det+bend*100,t,0.02); }
+function swell(semi,v,pn,pp){ pp=pp||PP(); const t=ac.currentTime, f=hz(root()+12+semi+pp.pitch), g=ac.createGain(), out=gate(t,4,{...pp,reverse:false,cut:1},pn); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.26*(0.5+v*0.5)*pp.level,t+0.35+0.4*(1-v));
+  const vib=ac.createOscillator(); vib.frequency.value=4.6; const vg=ac.createGain(); vg.gain.setValueAtTime(0,t); vg.gain.linearRampToValueAtTime(5,t+1.2); vib.connect(vg); vib.start(t); const oscs=[];
+  for(const [mul,gain,det] of [[1,1,0],[1,0.35,4],[2,0.12+pp.tone*0.2,0],[3,0.03,0]]){ const o=ac.createOscillator(); o.type='sine'; o.frequency.value=f*mul; o.detune.value=det+bend*100; vg.connect(o.detune); const og=ac.createGain(); og.gain.value=gain; o.connect(og).connect(g); o.start(t); oscs.push(o); const e={o,det}; bendable.add(e); o.onended=()=>bendable.delete(e); }
+  g.connect(out); revSend(g,1.6*pp.rev); return ()=>{ const tt=ac.currentTime; g.gain.cancelScheduledValues(tt); g.gain.setTargetAtTime(0.0001,tt,0.35); oscs.forEach(o=>o.stop(tt+2)); vib.stop(tt+2); }; }
 function noise(o,pp,at){ pp=pp||PP(); const t=at||ac.currentTime, n=ac.createBufferSource(); n.buffer=noiseB; n.loop=true; const f=ac.createBiquadFilter(), fm=Math.pow(2,pp.pitch/12)*(0.5+pp.tone); if(o.bp){ f.type='bandpass'; f.frequency.value=o.bp*fm; f.Q.value=o.q||1; } else { f.type='highpass'; f.frequency.value=(o.hp||1000)*fm; }
   const len=o.len*(o.hold?1:dec()*pp.decay), g=ac.createGain(), lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=7500; const out=gate(t,o.hold?2:len,pp,o.pan); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(o.gain*1.6*pp.level,t+(o.fadeIn||0.002)); if(!o.hold) g.gain.exponentialRampToValueAtTime(0.0001,t+len);
   let last=g; if(o.am){ const l=ac.createOscillator(); l.type='square'; l.frequency.value=o.am; const lg=ac.createGain(); lg.gain.value=0.5; const off=ac.createGain(); off.gain.value=0.5; l.connect(lg).connect(off.gain); g.connect(off); last=off; l.start(t); l.stop(t+(o.hold?60:len+0.05)); }
@@ -252,14 +262,15 @@ const SETS={
     mk('ドローン i','hold',(v,pn,pp,at)=>droneHold([-12,0,7,12],v,pn,pp,at)),mk('ドローン VI','hold',(v,pn,pp,at)=>droneHold([-4,3,8,15],v,pn,pp,at)),
     mk('ドローン 9','hold',(v,pn,pp,at)=>droneHold([0,14,19,26],v,pn,pp,at)),mk('風','hold',wind)]},
   grain:{name:'粒',pads:Array.from({length:8},(_,i)=>mk('粒 '+(i+1),'—',(v,pn,pp,at)=>grain(i,v,pn,pp,at),{clean:true}))},
+  glide:{name:'なぞる',pads:PENTA.slice(0,8).map((semi,i)=>mk(KEYS[(key+semi)%12],'pluck',(v,pn,pp,at)=>tone(semi,v,pn,pp,at),{clean:true,glide:true,voice:'pluck',rev:1.2}))},
   orbit:{name:'軌道',pads:PENTA.slice(0,8).map((semi,i)=>{ const o=mk(KEYS[(key+semi)%12],'wall',null,{clean:true}); o.src={set:'pure',idx:i}; o.f=(v,pn,pp,at)=>{ const sp=SETS[o.src.set].pads[o.src.idx]; return sp.f(v,pn,{...sp.p,pitch:sp.p.pitch+pp.pitch,level:sp.p.level*pp.level,decay:sp.p.decay*pp.decay,reverse:pp.reverse,cut:pp.cut},at); }; return o; })},
 };
 let selected={set:'tone',idx:0}, editMode=false, latch=true; const selPad=()=>SETS[selected.set].pads[selected.idx];
 const setsEl=$('#sets'), gridEl=$('#grid'), padsEl=$('#pads'); const heldCells=new Set();
 Object.entries(SETS).forEach(([id,s])=>{ const b=document.createElement('button'); b.textContent=s.name; b.dataset.set=id; b.onclick=()=>{ curSet=id; if(selected.set!==id){ selected={set:id,idx:0}; } build(); }; setsEl.appendChild(b); });
 const MULTS=[0.25,0.5,1,2,4], multLabel=m=>m===0.25?'¼':m===0.5?'½':'×'+m;
-function build(){ setsEl.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.set===curSet)); SETS.tone.pads.forEach((p,i)=>p.l=KEYS[(key+PENTA[i])%12]); SETS.pure.pads.forEach((p,i)=>p.l=KEYS[(key+PENTA[i])%12]); SETS.orbit.pads.forEach((p,i)=>{ const sp=SETS[p.src.set].pads[p.src.idx]; p.l=sp.l; p.s=SETS[p.src.set].name; });
-  const isOrbit=curSet==='orbit'; $('#arena').hidden=!isOrbit; $('#arena-row').hidden=!isOrbit; $('#arena-help').hidden=!isOrbit; if(isOrbit) requestAnimationFrame(arenaResize);
+function build(){ setsEl.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.set===curSet)); SETS.tone.pads.forEach((p,i)=>p.l=KEYS[(key+PENTA[i])%12]); SETS.pure.pads.forEach((p,i)=>p.l=KEYS[(key+PENTA[i])%12]); SETS.glide.pads.forEach((p,i)=>p.l=KEYS[(key+PENTA[i])%12]); SETS.orbit.pads.forEach((p,i)=>{ const sp=SETS[p.src.set].pads[p.src.idx]; p.l=sp.l; p.s=SETS[p.src.set].name; });
+  const isOrbit=curSet==='orbit', isGlide=curSet==='glide'; $('#arena').hidden=!isOrbit; $('#arena-row').hidden=!isOrbit; $('#arena-help').hidden=!isOrbit; if(isOrbit) requestAnimationFrame(arenaResize); $('#glide').hidden=!isGlide; $('#glide-row').hidden=!isGlide; gridEl.hidden=isGlide; if(isGlide) requestAnimationFrame(glResize);
   gridEl.innerHTML=''; padsEl.innerHTML='';
   SETS[curSet].pads.forEach((p,i)=>{
     const rw=document.createElement('div'); rw.className='rw'; rw.innerHTML=`<div class="nm">${p.l}</div><div class="rt">${multLabel(p.mult)}</div><div class="cells">${Array.from({length:16},(_,k)=>`<div class="c ${k%4===0?'b4':''}" data-k="${k}"></div>`).join('')}</div>`;
@@ -324,6 +335,36 @@ $('#a-bm').onclick=()=>{ nBalls=Math.max(1,nBalls-1); setBalls(); $('#a-balls').
 $('#a-shape').onclick=e=>{ shapeI=(shapeI+1)%SHAPES.length; e.target.textContent=SHAPES[shapeI][0]; resetBalls(); };
 $('#a-grav').onclick=e=>{ grav=grav>=100?20:grav+20; e.target.textContent='Grav '+grav; };
 
+/* ---------- glide surface: a lattice of consonant neighbours; drag = runs of short notes, hold = swell; 2nd finger = bend + tone ---------- */
+const gl=$('#glide'), gg=gl.getContext('2d'); let GW=0,GH=0; const GC=6, GR=6; let glScale='penta', glVoice='pluck';
+const SC={penta:[0,3,5,7,10],minor:[0,2,3,5,7,8,10]};
+function glResize(){ const r=gl.getBoundingClientRect(); if(!r.width) return; const d=Math.min(2,devicePixelRatio||1); GW=r.width;GH=r.height; gl.width=GW*d; gl.height=GH*d; gg.setTransform(d,0,0,d,0,0); }
+new ResizeObserver(glResize).observe(gl);
+const fxW=()=>Math.max(54,GW*0.2), cellW=()=>(GW-fxW())/GC, cellH=()=>GH/GR;
+function cellSemi(c,r){ const sc=SC[glScale], step=glScale==='penta'?2:3; const deg=c+step*r; return 12*Math.floor(deg/sc.length)+sc[deg%sc.length]-12; }  // from C3 up ~2.5 octaves
+const glPointers=new Map(); let glTone=0.5; const lit=new Map();
+function glNote(c,r,v,quick){ const semi=cellSemi(c,r), pp=Object.assign(PP(),{clean:true,glide:true,voice:glVoice,tone:glTone,rev:1.2}); const pn=(c-(GC-1)/2)/(GC-1)*1.2; lit.set(c+':'+r,1); if(quick) tone(semi,v,pn,pp); return ()=>{}; }
+function glSwell(c,r,v){ const semi=cellSemi(c,r), pp=Object.assign(PP(),{clean:true,glide:true,tone:glTone,rev:1.2}); const pn=(c-(GC-1)/2)/(GC-1)*1.2; return swell(semi,v,pn,pp); }
+function glHit(e){ const r=gl.getBoundingClientRect(); return {x:e.clientX-r.left,y:e.clientY-r.top}; }
+gl.addEventListener('pointerdown',e=>{ ensureAudio(); gl.setPointerCapture(e.pointerId); const {x,y}=glHit(e);
+  if(x>GW-fxW()){ glPointers.set(e.pointerId,{fx:true}); glFx(x,y); return; }
+  const c=Math.min(GC-1,Math.floor(x/cellW())), rr=GR-1-Math.min(GR-1,Math.floor(y/cellH())); const st={fx:false,c,rr,t:performance.now(),stop:null,lx:x,ly:y}; glPointers.set(e.pointerId,st); glNote(c,rr,0.75,true); st.timer=setTimeout(()=>{ if(glPointers.get(e.pointerId)===st&&!st.stop) st.stop=glSwell(c,rr,0.7); },260); });
+gl.addEventListener('pointermove',e=>{ const st=glPointers.get(e.pointerId); if(!st) return; const {x,y}=glHit(e); if(st.fx){ glFx(x,y); return; }
+  const c=Math.min(GC-1,Math.max(0,Math.floor(x/cellW()))), rr=GR-1-Math.min(GR-1,Math.max(0,Math.floor(y/cellH())));
+  if(c!==st.c||rr!==st.rr){ const sp=Math.hypot(x-st.lx,y-st.ly)/Math.max(1,performance.now()-st.t); st.c=c; st.rr=rr; st.t=performance.now(); st.lx=x; st.ly=y; clearTimeout(st.timer); if(st.stop){ st.stop(); st.stop=null; } glNote(c,rr,Math.min(1,0.45+sp*0.4),true); st.timer=setTimeout(()=>{ if(glPointers.get(e.pointerId)===st&&!st.stop) st.stop=glSwell(c,rr,0.7); },260); } });
+const glUp=e=>{ const st=glPointers.get(e.pointerId); if(!st) return; clearTimeout(st.timer); if(st.stop) st.stop(); glPointers.delete(e.pointerId); if(st.fx&&![...glPointers.values()].some(p=>p.fx)){ setBend(0); } };
+gl.addEventListener('pointerup',glUp); gl.addEventListener('pointercancel',glUp);
+let glFxPos=null; function glFx(x,y){ const fx0=GW-fxW(); const u=Math.min(1,Math.max(0,(x-fx0)/fxW())), vv=Math.min(1,Math.max(0,1-y/GH)); glFxPos={u,vv}; setBend(Math.round((vv-0.5)*24)); glTone=u; if(M){ const t=ac.currentTime; M.gdrive.curve=u<0.03?new Float32Array([-1,0,1]):satCurve(Math.pow(u,2)*0.9); M.glp.frequency.setTargetAtTime(1200*Math.pow(12,u),t,0.03); } }
+$('#gl-scale').onclick=e=>{ glScale=glScale==='penta'?'minor':'penta'; e.target.textContent=glScale==='penta'?'ペンタ':'マイナー'; };
+$('#gl-voice').onclick=e=>{ const vs=['pluck','glass','box','piano','harp','chime','bell']; glVoice=vs[(vs.indexOf(glVoice)+1)%vs.length]; e.target.textContent=glVoice[0].toUpperCase()+glVoice.slice(1); };
+function drawGlide(){ if(!GW) glResize(); if(!GW||$('#glide').hidden) return; gg.clearRect(0,0,GW,GH); const cw=cellW(), ch=cellH(), fx0=GW-fxW(), acc=css('--acc'), fg=css('--fg'), dim=css('--dim'), line=css('--line');
+  for(let c=0;c<GC;c++) for(let r=0;r<GR;r++){ const x=c*cw, y=(GR-1-r)*ch; const k=c+':'+r; const a=lit.get(k)||0; gg.strokeStyle=line; gg.strokeRect(x+0.5,y+0.5,cw-1,ch-1); if(a>0){ gg.fillStyle=acc; gg.globalAlpha=a*0.5; gg.fillRect(x+1,y+1,cw-2,ch-2); gg.globalAlpha=1; lit.set(k,a-0.05); if(a<=0.05) lit.delete(k); }
+    const semi=cellSemi(c,r); const name=KEYS[((key+semi)%12+12)%12], oct=4+Math.floor((semi+key)/12); gg.fillStyle=semi%12===0?fg:dim; gg.font=(semi%12===0?'600 ':'')+'11px '+css('--mono'); gg.textAlign='center'; gg.textBaseline='middle'; gg.fillText(name+oct,x+cw/2,y+ch/2); }
+  gg.fillStyle='#0e0e0f'; gg.fillRect(fx0,0,fxW(),GH); gg.strokeStyle=line; gg.strokeRect(fx0+0.5,0.5,fxW()-1,GH-1); gg.fillStyle=dim; for(let y=12;y<GH;y+=12) for(let x=fx0+10;x<GW-6;x+=12){ gg.beginPath(); gg.arc(x,y,0.7,0,6.283); gg.fill(); }
+  gg.strokeStyle=dim; gg.setLineDash([2,4]); gg.beginPath(); gg.moveTo(fx0,GH/2+0.5); gg.lineTo(GW,GH/2+0.5); gg.stroke(); gg.setLineDash([]);
+  gg.fillStyle=dim; gg.font='9px '+css('--mono'); gg.textAlign='center'; gg.fillText('+12',fx0+fxW()/2,10); gg.fillText('−12',fx0+fxW()/2,GH-8); gg.save(); gg.translate(fx0+8,GH/2); gg.rotate(-Math.PI/2); gg.fillText('BEND ↕ · TONE ↔',0,0); gg.restore();
+  if(glFxPos){ const px=fx0+glFxPos.u*fxW(), py=(1-glFxPos.vv)*GH; gg.fillStyle=acc; gg.beginPath(); gg.arc(px,py,7,0,6.283); gg.fill(); gg.strokeStyle=acc; gg.globalAlpha=0.4; gg.beginPath(); gg.arc(px,py,14,0,6.283); gg.stroke(); gg.globalAlpha=1; } }
+
 /* ---------- hold FX on the pad bus ---------- */
 const fx={st32:false,st16:false,dive:false,stop:false};
 function fxOn(k){ ensureAudio(); const t=ac.currentTime; fx[k]=true; if(k==='st32'||k==='st16'){ M.stD.delayTime.setValueAtTime(k==='st16'?0.125:0.0625,t); M.stFb.gain.setTargetAtTime(1,t,0.005); M.stIn.gain.setTargetAtTime(0,t,0.005); } if(k==='dive'){ M.lp.frequency.setTargetAtTime(150,t,0.25); M.clp.frequency.setTargetAtTime(150,t,0.25); } if(k==='stop'){ M.lp.frequency.setTargetAtTime(200,t,0.5); M.clp.frequency.setTargetAtTime(200,t,0.5); M.stD.delayTime.setValueAtTime(0.0625,t); M.stFb.gain.setTargetAtTime(0.97,t,0.01); M.stIn.gain.setTargetAtTime(0,t,0.01); M.stD.delayTime.linearRampToValueAtTime(0.5,t+1.2); } }
@@ -332,7 +373,7 @@ document.querySelectorAll('.fx button').forEach(b=>{ const k=b.dataset.fx; const
 
 
 /* ---------- 降らす ---------- */
-let autoTimer=null; function autoTick(){ if(!autoOn) return; const pads=SETS[curSet].pads; const i=Math.floor(Math.random()*pads.length), p=pads[i], v=0.3+Math.random()*0.6, pn=(Math.random()-0.5)*1.2; const stop=p.f(v,pn,p.p); const el=padsEl.children[i]; if(el){ el.classList.add('lit'); setTimeout(()=>el.classList.remove('lit'),120); }
+let autoTimer=null; function autoTick(){ if(!autoOn) return; if(curSet==='glide'){ const c=Math.floor(Math.random()*GC), r=Math.floor(Math.random()*GR); glNote(c,r,0.4+Math.random()*0.5,true); const base=60/P.rate*1000*0.5, swing=+$('#k-swing').value; autoTimer=setTimeout(autoTick,Math.max(40,Math.random()<swing?base*(0.5+Math.random()*2.5):base)); return; } const pads=SETS[curSet].pads; const i=Math.floor(Math.random()*pads.length), p=pads[i], v=0.3+Math.random()*0.6, pn=(Math.random()-0.5)*1.2; const stop=p.f(v,pn,p.p); const el=padsEl.children[i]; if(el){ el.classList.add('lit'); setTimeout(()=>el.classList.remove('lit'),120); }
   if(stop) setTimeout(stop,400+Math.random()*2500); const swing=+$('#k-swing').value; const base=60/P.rate*1000*0.5; const wait=Math.random()<swing?base*(0.5+Math.random()*2.5):base; autoTimer=setTimeout(autoTick,Math.max(40,wait)); }
 $('#b-auto').onclick=()=>{ ensureAudio(); autoOn=!autoOn; $('#b-auto').classList.toggle('on',autoOn); clearTimeout(autoTimer); if(autoOn) autoTick(); };
 
@@ -368,7 +409,7 @@ let micRec=null; $('#b-micclip').onclick=async()=>{ ensureAudio(); if(micRec){ m
     micRec.start(); $('#b-micclip').classList.add('on'); $('#b-micclip').textContent='■ Stop mic'; if(recLen) setTimeout(()=>{ if(micRec) micRec.stop(); },recLen*1000); }catch(e){ toast('マイクが許可されませんでした'); } };
 
 /* ---------- timeline model ---------- */
-const COLORS={'綺麗':'#e0a92a','澄':'#f2e6c8','ノイズ':'#dcd7cb','低音':'#5aa0b0','粒':'#e5668f','軌道':'#4fae68','マイク':'#ff7a1a'};
+const COLORS={'綺麗':'#e0a92a','澄':'#f2e6c8','なぞる':'#ffd27a','ノイズ':'#dcd7cb','低音':'#5aa0b0','粒':'#e5668f','軌道':'#4fae68','マイク':'#ff7a1a'};
 let clips=[], sel=null, tlLen=60, head=0, tlPlaying=false, tlLoop=false, tlStartAt=0, tlHeadAt=0, zoom=1, scrollX=0; const LANES=6, LANE_H=44, RULER=18;
 function addClip(buf,name){ const dur=buf.duration; let lane=0; for(lane=0;lane<LANES;lane++){ if(!clips.some(c=>c.lane===lane&&c.start<head+dur&&c.start+c.len>head)) break; } if(lane>=LANES) lane=LANES-1;
   const c={id:Date.now()+Math.random(),buf,rbuf:null,name,color:COLORS[name]||'#dcd7cb',start:snap(head),lane,offset:0,len:dur,gain:1,fi:0.02,fo:0.05,rep:1,reverse:false,muted:false}; clips.push(c); sel=c; if(c.start+c.len>tlLen){ tlLen=Math.ceil((c.start+c.len)/30)*30; $('#t-len').value=String(Math.min(120,tlLen)); } renderClipbar(); $('#r-n').textContent=clips.length; toast(name+' を '+c.start.toFixed(1)+'s のレーン'+(lane+1)+'に置きました'); if(tlPlaying) restartPlayback(); }
@@ -436,7 +477,7 @@ $('#cb-del').onclick=()=>{ if(!sel) return; clips=clips.filter(c=>c!==sel); sel=
 
 /* ---------- stack view (top): small overview of the timeline ---------- */
 const cv=$('#stack'), g=cv.getContext('2d'); let W=0,H=0; function resize(){ const r=cv.getBoundingClientRect(); const d=Math.min(2,devicePixelRatio||1); W=r.width;H=r.height; cv.width=W*d; cv.height=H*d; g.setTransform(d,0,0,d,0,0); } new ResizeObserver(resize).observe(cv); resize();
-function frame(now){ requestAnimationFrame(frame); arenaStep(now); g.clearRect(0,0,W,H); const lh=(H-4)/LANES; for(const c of clips){ g.fillStyle=c.color; g.globalAlpha=c.muted?0.25:0.8; g.fillRect(c.start/tlLen*W,2+c.lane*lh,Math.max(2,c.len/tlLen*W),lh-1); } g.globalAlpha=1; g.fillStyle=css('--fg'); g.fillRect(tlPos()/tlLen*W-0.5,0,1,H); if(recording){ g.strokeStyle=css('--rec'); g.strokeRect(0.5,0.5,W-1,H-1); } drawTL(); $('#dsp').textContent='DSP '+String(Math.min(99,10+clips.length*4+(P.rev*0.2|0))).padStart(2,'0')+'%'; }
+function frame(now){ requestAnimationFrame(frame); arenaStep(now); drawGlide(); g.clearRect(0,0,W,H); const lh=(H-4)/LANES; for(const c of clips){ g.fillStyle=c.color; g.globalAlpha=c.muted?0.25:0.8; g.fillRect(c.start/tlLen*W,2+c.lane*lh,Math.max(2,c.len/tlLen*W),lh-1); } g.globalAlpha=1; g.fillStyle=css('--fg'); g.fillRect(tlPos()/tlLen*W-0.5,0,1,H); if(recording){ g.strokeStyle=css('--rec'); g.strokeRect(0.5,0.5,W-1,H-1); } drawTL(); $('#dsp').textContent='DSP '+String(Math.min(99,10+clips.length*4+(P.rev*0.2|0))).padStart(2,'0')+'%'; }
 requestAnimationFrame(frame);
 
 /* ---------- export ---------- */
