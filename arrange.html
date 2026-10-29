@@ -84,7 +84,7 @@ input[type=range]{flex:1;min-width:60px;accent-color:var(--acc);height:28px;marg
     <canvas id="glide" hidden></canvas>
     <div id="glide-row" hidden>
       <div class="chips" id="instr"></div>
-      <div class="row" style="margin-top:6px"><button id="gl-scale">ペンタ</button><button id="b-mac">音色</button><span class="lbl" style="margin-left:auto;text-transform:none">なぞる=連打 · 止める=膨らむ/続く · 右の帯=2本目の指(↕ピッチ ↔明るさ/歪み)</span></div>
+      <div class="row" style="margin-top:6px"><button id="gl-scale">ペンタ</button><button id="gl-chord">和音</button><button id="b-mac">音色</button><span class="lbl" style="margin-left:auto;text-transform:none">なぞる=連打 · 止める=膨らむ/続く · 右の帯=2本目の指(↕ピッチ ↔明るさ/歪み)</span></div>
       <div id="macro" class="editor" hidden>
         <div class="hd"><span id="mac-name">—</span><span><button id="mac-reset">Reset</button></span></div>
         <div class="row">
@@ -238,13 +238,14 @@ function tone(semi,v,pn,pp,at){ pp=pp||PP(); const t=at||ac.currentTime, f=hz(ro
     tapeKeys:{p:[[1,1,0,0],[2,0.5,0,0],[3,0.28,0,0],[4,0.12,0,0],[5,0.06,0,0]],att:0.05,dur:1.3+v*0.9,lp:1400,wob:0.35},
     choir:  {p:[[1,1,-7,0],[1,1,7,0],[2,0.3,0,0],[3,0.1,0,0]],att:0.45,dur:2.6+v*1.5,lp:2200,wob:0.25},
     organ:  {p:[[1,1,0,0],[2,0.6,0,0],[3,0.4,0,0],[4,0.3,0,0],[6,0.1,0,0]],att:0.03,dur:1.1+v*0.8,lp:3000,wob:0.15,trem:true},
-    sub:    {p:[[0.5,1,0,0],[1,0.3,0,0],[2,0.05,0,0.3]],att:0.012,dur:1.2+v*0.8} }[kind]||null;
-  const spec=V||{p:[[1,1,0,0]],att:0.01,dur:2}; const dur=spec.dur*dec()*pp.decay, att=Math.min(dur*0.8,spec.att*(pp.attMul||1)), out=gate(t,dur,pp,pn), g=ac.createGain(); const lvl=(kind==='pad'||kind==='breath'||kind==='choir'?0.22:kind==='revgtr'?0.16:0.3)*(0.4+v*0.6)*pp.level;
+    sub:    {p:[[0.5,1,0,0],[1,0.3,0,0],[2,0.05,0,0.3]],att:0.012,dur:1.2+v*0.8},
+    vpiano: {p:[[1,1,0,0],[2,0.035,0,0.3],[3,0.006,0,0.15]],att:0.07,dur:Math.max(0.3,Math.min(4.2,4.6-((semi+pp.pitch+12)*0.11)))*(0.45+v*0.7),trem:true,tremRate:5.5+Math.random()*1.5,tremDepth:0.15} }[kind]||null;
+  const spec=V||{p:[[1,1,0,0]],att:0.01,dur:2}; const dur=spec.dur*dec()*pp.decay, att=Math.min(dur*0.8,spec.att*(pp.attMul||1)), out=gate(t,dur,pp,pn), g=ac.createGain(); const lvl=(kind==='pad'||kind==='breath'||kind==='choir'?0.22:kind==='revgtr'?0.16:kind==='vpiano'?0.34:0.3)*(kind==='vpiano'?0.25+v*0.75:0.4+v*0.6)*pp.level;
   if(spec.rev){ g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(lvl,t+dur*0.9); g.gain.setValueAtTime(0,t+dur*0.9+0.004); }   // tape played backwards: swells up, then cuts
   else { g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(lvl,t+att); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); }
   const wobAmt=(pp.wob!==undefined?pp.wob:(spec.wob||0)); let wobG=null; if(wobAmt>0){ const lfo=ac.createOscillator(); lfo.frequency.value=spec.wob?0.6+Math.random()*0.8:4.5+Math.random(); wobG=ac.createGain(); wobG.gain.value=wobAmt*(spec.wob?40:12); lfo.connect(wobG); lfo.start(t); lfo.stop(t+dur+0.2); if(spec.wob){ const fl=ac.createOscillator(); fl.frequency.value=7+Math.random()*3; const fg=ac.createGain(); fg.gain.value=wobAmt*6; fl.connect(fg).connect(wobG); fl.start(t); fl.stop(t+dur+0.2); } }
   let dest=g; if(spec.lp){ const nlp=ac.createBiquadFilter(); nlp.type='lowpass'; nlp.Q.value=0.8; if(spec.rev){ nlp.frequency.setValueAtTime(spec.lp,t); nlp.frequency.exponentialRampToValueAtTime(2200+pp.tone*3500,t+dur*0.9); } else nlp.frequency.value=spec.lp*(0.5+pp.tone*1.4); nlp.connect(g); dest=nlp; }
-  if(spec.trem){ const tr=ac.createOscillator(); tr.frequency.value=spec.rev?8.5:5.5; const tg=ac.createGain(); tg.gain.value=spec.rev?0.22:0.35; const base=ac.createGain(); base.gain.value=0.65; tr.connect(tg).connect(base.gain); const old=dest; dest=ac.createGain(); dest.connect(base); base.connect(old); tr.start(t); tr.stop(t+dur+0.2); }
+  if(spec.trem){ const tr=ac.createOscillator(); tr.frequency.value=spec.tremRate||(spec.rev?8.5:5.5); const tg=ac.createGain(); tg.gain.value=spec.tremDepth||(spec.rev?0.22:0.35); const base=ac.createGain(); base.gain.value=1-(spec.tremDepth||0.35); tr.connect(tg).connect(base.gain); const old=dest; dest=ac.createGain(); dest.connect(base); base.connect(old); tr.start(t); tr.stop(t+dur+0.2); }
   const bright=0.3+pp.tone*1.2; for(const [mul,gain,det,dc] of spec.p){ const gg=gain*(mul>1?bright:1); if(gg<0.004) continue; const o=ac.createOscillator(); o.type=(kind==='tapeKeys'&&mul>=2)?'triangle':'sine'; o.frequency.value=f*mul; const bd=det+(pp.glide?bend*100:0); o.detune.value=bd; if(wobG) wobG.connect(o.detune); const og=ac.createGain(); og.gain.setValueAtTime(gg,t); if(dc) og.gain.setTargetAtTime(0.0001,t+att,dc*dec()); o.connect(og).connect(dest); o.start(t); o.stop(t+dur+0.1); if(pp.glide){ const e={o,det}; bendable.add(e); o.onended=()=>bendable.delete(e); } }
   if(kind==='breath'){ const n=ac.createBufferSource(); n.buffer=noiseB; n.loop=true; const bp=ac.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=f*2; bp.Q.value=6; const ng=ac.createGain(); ng.gain.value=0.25; n.connect(bp).connect(ng).connect(g); n.start(t); n.stop(t+dur+0.1); }
   g.connect(out); revSend(g,1.4*pp.rev); }
@@ -286,9 +287,13 @@ function bed(semi,v,pn,pp,hold){ pp=pp||PP(); const t=ac.currentTime, bm=root()+
 /* sparkle: a shower of very quiet, very short high notes leaping by octaves and fifths, free-timed, sometimes two at once — the layer that shimmers under everything */
 const MINOR7=[0,2,3,5,7,8,10];
 function sparkle(semi,v,pn,pp,hold){ pp=pp||PP(); let on=true; const base=root()+12+semi+pp.pitch; const one=(center)=>{ const leaps=[0,0,12,12,24,7,19,-12,5,17,-5]; let m=center+leaps[Math.floor(Math.random()*leaps.length)]; m=Math.max(root()+12,Math.min(root()+48,m)); const rel=((m-root())%12+12)%12; if(!MINOR7.includes(rel)){ m+=1; } const vv=Math.random()<0.15?0.42:0.1+Math.random()*0.16;
-      const sp={...pp,voice:Math.random()<0.5?'glass':'box',decay:0.25+Math.random()*0.35,level:pp.level*0.55,rev:pp.rev*1.4,clean:true,glide:true}; tone(m-root()-12,vv,pn+(Math.random()-0.5)*0.8,sp); if(Math.random()<0.3) setTimeout(()=>tone(m-root()-12+[7,12,5][Math.floor(Math.random()*3)],vv*0.8,pn,sp),8+Math.random()*15); return m; };
+      const sp={...pp,voice:'vpiano',decay:0.6+Math.random()*0.5,level:pp.level*0.7,rev:pp.rev*1.3,clean:true,glide:true}; tone(m-root()-12,vv,pn+(Math.random()-0.5)*0.8,sp); if(Math.random()<0.18) setTimeout(()=>tone(m-root()-12+[7,12,5][Math.floor(Math.random()*3)],vv*0.8,pn,sp),4+Math.random()*10); return m; };
   if(!hold){ let n=3+Math.floor(Math.random()*6), c=base; let dt=0; for(let k=0;k<n;k++){ setTimeout(()=>{ c=one(c); },dt); dt+=40+Math.random()*130*(1.2-v); } return ()=>{}; }
-  let c=base; const loop=()=>{ if(!on) return; c=one(c); if(Math.random()<0.2) c=base; setTimeout(loop,45+Math.random()*160); }; loop(); return ()=>{ on=false; }; }
+  let c=base; const loop=()=>{ if(!on) return; c=one(c); if(Math.random()<0.2) c=base; setTimeout(loop,60+Math.random()*220); }; loop(); return ()=>{ on=false; }; }
+function pianoHold(semi,v,pn,pp){ pp=pp||PP(); const t=ac.currentTime, f=hz(root()+12+semi+pp.pitch), g=ac.createGain(), out=gate(t,60,{...pp,reverse:false,cut:1},pn), lvl=0.34*(0.25+v*0.75)*pp.level; g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(lvl,t+0.07); g.gain.exponentialRampToValueAtTime(lvl*0.45,t+3); g.gain.exponentialRampToValueAtTime(lvl*0.2,t+9);
+  const tr=ac.createOscillator(); tr.frequency.value=5.5+Math.random()*1.5; const tg=ac.createGain(); tg.gain.value=0.15; const base=ac.createGain(); base.gain.value=0.85; tr.connect(tg).connect(base.gain); base.connect(g); tr.start(t); const oscs=[tr];
+  for(const [mul,gn] of [[1,1],[2,0.035],[3,0.006]]){ const o=ac.createOscillator(); o.type='sine'; o.frequency.value=f*mul; o.detune.value=bend*100; const og=ac.createGain(); og.gain.value=gn; o.connect(og).connect(base); o.start(t); oscs.push(o); const e={o,det:0}; bendable.add(e); o.onended=()=>bendable.delete(e); }
+  g.connect(out); revSend(g,1.3*pp.rev); return ()=>{ const tt=ac.currentTime; g.gain.cancelScheduledValues(tt); g.gain.setValueAtTime(g.gain.value,tt); g.gain.exponentialRampToValueAtTime(0.0001,tt+0.9); oscs.forEach(o=>o.stop(tt+1)); }; }
 function revHold(semi,v,pn,pp){ pp=pp||PP(); const t=ac.currentTime, f=hz(root()+12+semi+pp.pitch), g=ac.createGain(), out=gate(t,6,{...pp,reverse:false,cut:1},pn), rise=(1.6+(1-v))*(pp.attMul||1); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.16*pp.level,t+rise); g.gain.exponentialRampToValueAtTime(0.19*pp.level,t+rise+6);
   const nlp=ac.createBiquadFilter(); nlp.type='lowpass'; nlp.Q.value=0.8; nlp.frequency.setValueAtTime(500,t); nlp.frequency.exponentialRampToValueAtTime(2200+pp.tone*3500,t+rise); const tr=ac.createOscillator(); tr.frequency.value=8.5; const tg=ac.createGain(); tg.gain.value=0.22; const base=ac.createGain(); base.gain.value=0.78; tr.connect(tg).connect(base.gain); nlp.connect(base).connect(g); tr.start(t); const oscs=[tr];
   for(const [mul,gain,det] of [[1,1,-5],[1,1,5],[2,0.6,-5],[2,0.6,5],[3,0.45,0],[4,0.3,0],[5,0.2,0],[6,0.14,0],[7,0.1,0],[8,0.07,0]]){ const o=ac.createOscillator(); o.type='sine'; o.frequency.value=f*mul; o.detune.value=det+bend*100; const og=ac.createGain(); og.gain.value=gain; o.connect(og).connect(nlp); o.start(t); oscs.push(o); const e={o,det}; bendable.add(e); o.onended=()=>bendable.delete(e); }
@@ -410,6 +415,7 @@ $('#a-grav').onclick=e=>{ grav=grav>=100?20:grav+20; e.target.textContent='Grav 
 
 /* ---------- glide surface: a lattice of consonant neighbours; drag = runs of short notes, hold = swell; 2nd finger = bend + tone ---------- */
 const INSTR=[
+  {id:'vpiano',name:'鍵盤(動画)',kind:'p',voice:'vpiano',m:{rev:0.65,bright:0.5}},
   {id:'sparkle',name:'きらめき',kind:'p',voice:'sparkle',m:{rev:0.8,dec:0.5}},{id:'bed',name:'床コード',kind:'p',voice:'bed',m:{rev:0.6,bright:0.4,oct:0}},
   {id:'pluck',name:'Pluck',kind:'p',voice:'pluck'},{id:'glass',name:'Glass',kind:'p',voice:'glass'},{id:'piano',name:'Piano',kind:'p',voice:'piano'},{id:'box',name:'Music box',kind:'p',voice:'box'},{id:'chime',name:'Chime',kind:'p',voice:'chime'},{id:'harp',name:'Harp',kind:'p',voice:'harp'},{id:'bell',name:'Bell',kind:'p',voice:'bell'},{id:'pad',name:'Pad',kind:'p',voice:'pad'},
   {id:'revgtr',name:'逆ギター',kind:'p',voice:'revgtr',m:{bright:0.5,rev:0.7,att:0.5,spread:0.4}},{id:'tapeKeys',name:'テープ鍵盤',kind:'p',voice:'tapeKeys',m:{wob:0.35,bright:0.4}},{id:'choir',name:'カセット合唱',kind:'p',voice:'choir',m:{wob:0.25,att:0.7}},{id:'organ',name:'VHSオルガン',kind:'p',voice:'organ',m:{wob:0.15}},{id:'sub',name:'サブ',kind:'p',voice:'sub',m:{oct:-1,rev:0.2}},{id:'robo',name:'ロボ',kind:'p',voice:'robo',m:{wob:0.2,bright:0.4,rev:0.35,dec:0.5}},
@@ -423,10 +429,11 @@ function glResize(){ const r=gl.getBoundingClientRect(); if(!r.width) return; co
 new ResizeObserver(glResize).observe(gl);
 const fxW=()=>Math.max(54,GW*0.2), cellW=()=>(GW-fxW())/GC, cellH=()=>GH/GR;
 function cellSemi(c,r){ const sc=SC[glScale], step=glScale==='penta'?2:3; const deg=c+step*r; return 12*Math.floor(deg/sc.length)+sc[deg%sc.length]-12; }  // from C3 up ~2.5 octaves
-const glPointers=new Map(); let glTone=0.5; const lit=new Map();
+const glPointers=new Map(); let glTone=0.5, glChord=false; const lit=new Map();
+function chordSemis(c,r){ const sm=cellSemi(c,r); if(!glChord) return [sm]; const sc=SC[glScale], step=glScale==='penta'?2:3, deg=c+step*r, L=sc.length; const at=d=>12*Math.floor(d/L)+sc[d%L]-12; return [sm,at(deg+2),at(deg+4)]; }   // diatonic triad on that degree
 const NROWS=['ツ','ツツツ','プツッ','ザッ','ザー','ピチー'];
 function glNote(c,r,v,quick){ const m=instr.mac, pn=(c-(GC-1)/2)/(GC-1)*1.4*m.spread; lit.set(c+':'+r,1); const u=c/(GC-1);
-  if(instr.kind==='p'){ const pp=macPP(m); if(instr.voice==='revgtr'){ revChord(cellSemi(c,r),v,pn,pp,false); return; } if(instr.voice==='robo'){ robo(cellSemi(c,r),v,pn,pp,false); return; } if(instr.voice==='bed'){ bed(cellSemi(c,r),v,pn,pp,false); return; } if(instr.voice==='sparkle'){ sparkle(cellSemi(c,r),v,pn,pp,false); return; } tone(cellSemi(c,r),v,pn,pp); return; }
+  if(instr.kind==='p'){ const pp=macPP(m); if(glChord&&!['revgtr','robo','bed','sparkle'].includes(instr.voice)){ chordSemis(c,r).forEach((sm,k)=>tone(sm,v*(k?0.8:1),pn,pp)); return; } if(instr.voice==='revgtr'){ revChord(cellSemi(c,r),v,pn,pp,false); return; } if(instr.voice==='robo'){ robo(cellSemi(c,r),v,pn,pp,false); return; } if(instr.voice==='bed'){ bed(cellSemi(c,r),v,pn,pp,false); return; } if(instr.voice==='sparkle'){ sparkle(cellSemi(c,r),v,pn,pp,false); return; } tone(cellSemi(c,r),v,pn,pp); return; }
   if(instr.kind==='g'){ if(!sample){ toast('出力タブ「粒の素材」で録音かファイルを入れてください'); return; } const pp=macPP(m,{pitch:[-12,-7,0,0,7,12][r]+m.oct*12,voice:undefined}); grain(Math.min(7,c),v,pn,pp); return; }
   const pp=macPP(m,{voice:undefined}); const g=0.35+v*0.5; // noise palette: row = kind, column = variation
   switch(r){ case 0: noise({hp:1200+u*5000,len:0.003+u*0.004,gain:g*0.5,pan:pn},pp); break;
@@ -436,6 +443,7 @@ function glNote(c,r,v,quick){ const m=instr.mac, pn=(c-(GC-1)/2)/(GC-1)*1.4*m.sp
     case 4: noise({bp:500+u*2500,q:0.6+u*0.6,len:0.3+u*0.5,gain:g*0.25,pan:pn,rev:0.4,fadeIn:0.03},pp); break;
     case 5: chirp(0.3+u*0.7,pn,Object.assign(pp,{pitch:(u-0.5)*12})); break; } }
 function glSwell(c,r,v){ const m=instr.mac, pn=(c-(GC-1)/2)/(GC-1)*1.4*m.spread, u=c/(GC-1);
+  if(instr.kind==='p'&&instr.voice==='vpiano'){ const stops=chordSemis(c,r).map(sm=>pianoHold(sm,v,pn,macPP(m))); return ()=>stops.forEach(f=>f()); }
   if(instr.kind==='p') return instr.voice==='revgtr'?revChord(cellSemi(c,r),v,pn,macPP(m),true):instr.voice==='robo'?robo(cellSemi(c,r),v,pn,macPP(m),true):instr.voice==='bed'?bed(cellSemi(c,r),v,pn,macPP(m),true):instr.voice==='sparkle'?sparkle(cellSemi(c,r),v,pn,macPP(m),true):swell(cellSemi(c,r),v,pn,macPP(m));
   if(instr.kind==='n'){ const pp=macPP(m,{voice:undefined});
     if(r===4) return noise({bp:500+u*2500,q:0.6+u*0.6,len:1,gain:0.3,pan:pn,rev:0.4,fadeIn:0.05,hold:true},pp);
@@ -453,6 +461,7 @@ const glUp=e=>{ const st=glPointers.get(e.pointerId); if(!st) return; clearTimeo
 gl.addEventListener('pointerup',glUp); gl.addEventListener('pointercancel',glUp);
 let glFxPos=null; function glFx(x,y){ const fx0=GW-fxW(); const u=Math.min(1,Math.max(0,(x-fx0)/fxW())), vv=Math.min(1,Math.max(0,1-y/GH)); glFxPos={u,vv}; setBend(Math.round((vv-0.5)*24)); glTone=u; if(M){ const t=ac.currentTime; const d=Math.max(instr.mac.drive,Math.max(0,u-0.5)*2); M.gdrive.curve=d<0.03?new Float32Array([-1,0,1]):satCurve(Math.pow(d,2)*0.9); M.glp.frequency.setTargetAtTime(600*Math.pow(25,u),t,0.03); } }
 $('#gl-scale').onclick=e=>{ glScale=glScale==='penta'?'minor':'penta'; e.target.textContent=glScale==='penta'?'ペンタ':'マイナー'; };
+$('#gl-chord').onclick=e=>{ glChord=!glChord; e.target.classList.toggle('on',glChord); };
 const instrEl=$('#instr'); INSTR.forEach(it=>{ const b=document.createElement('button'); b.textContent=it.kind==='n'?'ノイズ / グリッチ':it.name; b.dataset.i=it.id; if(it.kind!=='p') b.classList.add('grp'); b.onclick=()=>{ instr=it; ensureAudio(); applyDrive(); renderInstr(); }; instrEl.appendChild(b); });
 function renderInstr(){ instrEl.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.i===instr.id)); $('#mac-name').textContent=instr.name; document.querySelectorAll('[data-mac]').forEach(r=>r.value=instr.mac[r.dataset.mac]); $('#gl-scale').hidden=instr.kind!=='p'; }
 document.querySelectorAll('[data-mac]').forEach(r=>r.oninput=()=>{ instr.mac[r.dataset.mac]=+r.value; if(r.dataset.mac==='drive') applyDrive(); });
