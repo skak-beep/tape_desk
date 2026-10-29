@@ -100,14 +100,14 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
       <select id="t-len" aria-label="length"><option value="30">30s</option><option value="60" selected>60s</option><option value="90">90s</option><option value="120">120s</option></select>
     </div>
     <div id="clipbar" class="clipbar" hidden>
-      <div class="hd"><span id="cb-name">—</span><span><button id="cb-rev">逆再生</button><button id="cb-dup">複製</button><button id="cb-mute">Mute</button><button id="cb-del">削除</button><button id="cb-close">Close</button></span></div>
+      <div class="hd"><span id="cb-name">—</span><span><button id="cb-rev">逆再生</button><button id="cb-smooth">なめらか</button><button id="cb-dup">複製</button><button id="cb-mute">Mute</button><button id="cb-del">削除</button><button id="cb-close">Close</button></span></div>
       <div class="row">
         <label class="kn"><span>Gain</span><input id="cb-gain" type="range" min="0" max="1.5" step="0.01" value="1"></label>
         <label class="kn"><span>Fade in</span><input id="cb-fi" type="range" min="0" max="4" step="0.05" value="0.02"></label>
         <label class="kn"><span>Fade out</span><input id="cb-fo" type="range" min="0" max="4" step="0.05" value="0.05"></label>
         <label class="kn"><span>Repeat</span><input id="cb-rep" type="range" min="1" max="8" step="1" value="1"></label>
       </div>
-      <div class="lbl" style="text-transform:none">ドラッグで移動(上下でレーン)、端をつまんで長さ。Fade out 0 = ブツ切り。</div>
+      <div class="lbl" style="text-transform:none">ドラッグで移動(上下でレーン)、端をつまんで長さ。なめらか = 録音後の余韻を頭に巻き込み、ループのつなぎ目を自然に。Fade out 0 = ブツ切り。</div>
     </div>
     <div class="lbl" style="text-transform:none">空いている所をタップ=再生位置。「作る」で録ったフレーズは、再生位置の空いているレーンに置かれます。</div>
     <div class="row" id="sink-row" hidden><span class="lbl">出力先</span><select id="x-sink" aria-label="output device" style="flex:1"></select></div>
@@ -666,13 +666,13 @@ function recWithCount(){ ensureAudio(); if(recording){ rec(false); return; } if(
   cntTL=tlPlaying?{loop:tlLoop}:null; if(tlPlaying) tlPlay(false); countIn(()=>{ const w=cntTL; cntTL=null; rec(true,{withTL:!!w,loop:w&&w.loop}); },'フレーズ録音まで'); }
 $('#b-rec-top').onclick=recWithCount;
 
-let recName=null, recWithTL=false, recResume=false, recGo=false;
+let recName=null, recWithTL=false, recResume=false, recGo=false, recTailS=0, recMainS=0;
 function rec(on,opt){ ensureAudio(); if(on===recording) return; if(on&&typeof slAutoSet==='function'&&slAuto) slAutoSet(false); recording=on; setRecUI(on); opt=opt||{};
-  if(on){ const len=opt.len||recLen; recMax=Math.floor((len||120)*ac.sampleRate); recL=new Float32Array(recMax); recR=new Float32Array(recMax); recIdx=0; recGo=false; recStart=opt.start||ac.currentTime+0.05; recName=opt.name||null; capOn(true); recWithTL=tlPlaying||!!opt.withTL; recResume=recWithTL&&(opt.withTL?!!opt.loop:tlLoop); if(recWithTL){ if(tlPlaying) tlPlay(false); head=wa.s; tlPlay(true,recStart); } if(opt.len) return; toast(recLen?recLen+'秒 録音中':'録音中(■で止める)'); return; }
+  if(on){ const len=opt.len||recLen; recTailS=len?Math.floor(1.0*ac.sampleRate):0; recMainS=Math.floor((len||120)*ac.sampleRate); recMax=recMainS+recTailS; recL=new Float32Array(recMax); recR=new Float32Array(recMax); recIdx=0; recGo=false; recStart=opt.start||ac.currentTime+0.05; recName=opt.name||null; capOn(true); recWithTL=tlPlaying||!!opt.withTL; recResume=recWithTL&&(opt.withTL?!!opt.loop:tlLoop); if(recWithTL){ if(tlPlaying) tlPlay(false); head=wa.s; tlPlay(true,recStart); } if(opt.len) return; toast(recLen?recLen+'秒 録音中':'録音中(■で止める)'); return; }
   capOn(false); if(recWithTL){ recWithTL=false; if(tlPlaying) tlPlay(false); head=wa.s; }
   const resume=recResume; recResume=false; setTimeout(()=>{ if(resume&&!tlPlaying&&!recording){ head=wa.s; tlPlay(true); } },0);
   if(recL){ const n=Math.max(1,recIdx); let peak=0; for(let i=0;i<n;i+=53) peak=Math.max(peak,Math.abs(recL[i]),Math.abs(recR[i])); if(peak<0.003||n<ac.sampleRate*0.2){ toast('何も鳴らなかったので、フレーズは作りませんでした'); recL=recR=null; return; }
-    const buf=ac.createBuffer(2,n,ac.sampleRate); buf.copyToChannel(recL.subarray(0,n),0); buf.copyToChannel(recR.subarray(0,n),1); recL=recR=null; addClip(buf,recName||(mode==='glide'?instr.name:'ステップ')); recName=null; } }
+    const nm=Math.min(n,recMainS), buf=ac.createBuffer(2,nm,ac.sampleRate); buf.copyToChannel(recL.subarray(0,nm),0); buf.copyToChannel(recR.subarray(0,nm),1); let tail=null; if(n>nm+ac.sampleRate*0.05){ tail=ac.createBuffer(2,n-nm,ac.sampleRate); tail.copyToChannel(recL.subarray(nm,n),0); tail.copyToChannel(recR.subarray(nm,n),1); } recL=recR=null; addClip(buf,recName||(mode==='glide'?instr.name:'ステップ'),tail); recName=null; } }
 function capOn(on){ if(!ac) return; if(capNode){ capNode.port.postMessage({on}); return; } if(on){ if(!proc){ proc=ac.createScriptProcessor(2048,2,1); proc.onaudioprocess=onCapture; } M.pre.connect(proc); proc.connect(capSink); } else if(proc){ try{ M.pre.disconnect(proc); proc.disconnect(); }catch(e){} } }
 
 
@@ -681,10 +681,15 @@ const COLORS={'綺麗':'#e0a92a','澄':'#f2e6c8','なぞる':'#ffd27a','ノイ�
 let clips=[], sel=null, tlLen=60, head=0, tlPlaying=false, tlLoop=false, tlStartAt=0, tlHeadAt=0, zoom=1, scrollX=0; const LANES=6, LANE_H=44, RULER=34, WAH=14; let wa={s:0,e:60,full:true};   // full = automatic: the end follows the last clip (Premiere-style) until the bar is dragged by hand
 function fitWA(){ if(!wa.full) return; const ends=clips.map(c=>c.start+c.len); wa.s=0; wa.e=ends.length?Math.max(1,Math.min(tlLen,Math.ceil(Math.max(...ends)*2)/2)):tlLen; }   // wa = work area (play / loop / mixdown range)
 function tameBuf(buf,ceil){ let pk=0; for(let c=0;c<buf.numberOfChannels;c++){ const d=buf.getChannelData(c); for(let i=0;i<d.length;i++){ const a=Math.abs(d[i]); if(a>pk) pk=a; } } if(pk>ceil){ const g=ceil/pk; for(let c=0;c<buf.numberOfChannels;c++){ const d=buf.getChannelData(c); for(let i=0;i<d.length;i++) d[i]*=g; } } return buf; }
-function addClip(buf,name){ pushUndo(); tameBuf(buf,0.42); const dur=buf.duration; let lane=0; for(lane=0;lane<LANES;lane++){ if(!clips.some(c=>c.lane===lane&&c.start<head+dur&&c.start+c.len>head)) break; } if(lane>=LANES) lane=LANES-1;
-  const c={id:Date.now()+Math.random(),buf,rbuf:null,name,color:COLORS[name]||(mode==='glide'?'#ffd27a':'#dcd7cb'),start:snap(head),lane,offset:0,len:dur,gain:1,fi:0.02,fo:0.05,rep:1,reverse:false,muted:false}; clips.push(c); sel=c; if(c.start+c.len>tlLen){ tlLen=Math.ceil((c.start+c.len)/30)*30; $('#t-len').value=String(Math.min(120,tlLen)); } fitWA(); renderClipbar(); $('#r-n').textContent=clips.length; toast(name+' を '+c.start.toFixed(1)+'s のレーン'+(lane+1)+'に置きました'); if(tlPlaying) restartPlayback(); }
+function addClip(buf,name,tail){ pushUndo(); tameBuf(buf,0.42); if(tail) tameBuf(tail,0.42); const dur=buf.duration; let lane=0; for(lane=0;lane<LANES;lane++){ if(!clips.some(c=>c.lane===lane&&c.start<head+dur&&c.start+c.len>head)) break; } if(lane>=LANES) lane=LANES-1;
+  const c={id:Date.now()+Math.random(),buf,tail:tail||null,smooth:true,pbuf:null,pkey:'',rbuf:null,name,color:COLORS[name]||(mode==='glide'?'#ffd27a':'#dcd7cb'),start:snap(head),lane,offset:0,len:dur,gain:1,fi:0.02,fo:0.05,rep:1,reverse:false,muted:false}; clips.push(c); sel=c; if(c.start+c.len>tlLen){ tlLen=Math.ceil((c.start+c.len)/30)*30; $('#t-len').value=String(Math.min(120,tlLen)); } fitWA(); renderClipbar(); $('#r-n').textContent=clips.length; toast(name+' を '+c.start.toFixed(1)+'s のレーン'+(lane+1)+'に置きました'); if(tlPlaying) restartPlayback(); }
 const snap=v=>{ const s=+$('#t-snap').value; return s?Math.round(v/s)*s:v; };
-function clipBuf(c){ if(!c.reverse) return c.buf; if(!c.rbuf){ const b=c.buf; c.rbuf=ac.createBuffer(b.numberOfChannels,b.length,b.sampleRate); for(let ch=0;ch<b.numberOfChannels;ch++){ const s=b.getChannelData(ch), d=c.rbuf.getChannelData(ch); for(let i=0,n=s.length;i<n;i++) d[i]=s[n-1-i]; } } return c.rbuf; }
+function clipBuf(c){ const key=(c.smooth?'s':'r')+(c.reverse?'R':'F'); if(!c.smooth&&!c.reverse) return c.buf; if(c.pbuf&&c.pkey===key) return c.pbuf; const b=c.buf, sr=b.sampleRate, L=b.length, out=ac.createBuffer(b.numberOfChannels,L,sr);
+  for(let ch=0;ch<b.numberOfChannels;ch++){ const s=b.getChannelData(ch), d=out.getChannelData(ch); d.set(s);
+    if(c.smooth){ if(c.tail){ const t=c.tail.getChannelData(Math.min(ch,c.tail.numberOfChannels-1)), T=Math.min(t.length,L); for(let i=0;i<T;i++) d[i]+=t[i]*(1-i/T); }   // what rang on after the cut comes back under the start → the loop seam is covered
+      const fi=Math.min(Math.floor(sr*0.006),L>>2), fo=Math.min(Math.floor(sr*0.03),L>>2); for(let i=0;i<fi;i++) d[i]*=i/fi; for(let i=0;i<fo;i++) d[L-1-i]*=i/fo; }
+    if(c.reverse) d.reverse(); }
+  c.pbuf=out; c.pkey=key; return c.pbuf; }
 
 /* ---------- playback (live and offline share one scheduler) ---------- */
 let playing_nodes=[];
@@ -736,7 +741,7 @@ function drawTL(){ if(tlSec.hidden) return; if(!TW) tlResize(); tg.clearRect(0,0
   $('#r-pos').textContent=tlPos().toFixed(1).padStart(4,'0'); }
 function tlTick(){ syncTLButtons(); if(!tlPlaying) return; const p=tlPos(); if(p>=wa.e){ if(tlLoop&&!recording){ tlPlay(false); head=wa.s; tlPlay(true); } else { tlPlay(false); head=wa.s; } } $('#r-pos').textContent=tlPos().toFixed(1).padStart(4,'0'); syncTLButtons(); }
 function syncTLButtons(){ const p=tlPos(); $('#tp-pos').textContent=p.toFixed(1).padStart(4,'0')+'s'; const a=Math.max(0.001,wa.e-wa.s), u=Math.max(0,Math.min(1,(p-wa.s)/a)); $('#tp-fill').style.width=(u*100)+'%'; $('#tp-head').style.left='calc('+(u*100)+'% - 1px)'; }
-setInterval(()=>{ const st=$('#rec-status'); if(counting||micJob||micCancel) return; if(recording&&ac){ const el=Math.max(0,ac.currentTime-recStart); st.textContent='● '+el.toFixed(1)+(recLen?'/'+recLen:'')+'s'; st.className='lbl rec'; bandShow('● REC '+el.toFixed(1)+'s'+(recLen?' / '+recLen+'s':'')+'<small>'+(recName||'フレーズを録音中 — もう一度押すと停止')+'</small>'); } else { st.textContent=recLen?recLen+'s':'∞'; st.className='lbl'; } },100);
+setInterval(()=>{ const st=$('#rec-status'); if(counting||micJob||micCancel) return; if(recording&&ac){ const el=Math.max(0,ac.currentTime-recStart); const mainLen=recMainS/ac.sampleRate, over=recLen&&el>mainLen; st.textContent=over?'尾を録音中':'● '+el.toFixed(1)+(recLen?'/'+recLen:'')+'s'; st.className='lbl rec'; bandShow(over?'● 余韻を録音中…<small>あと少し — 鳴らし続けなくて大丈夫</small>':'● REC '+el.toFixed(1)+'s'+(recLen?' / '+recLen+'s':'')+'<small>'+(recName||'フレーズを録音中 — もう一度押すと停止')+'</small>'); } else { st.textContent=recLen?recLen+'s':'∞'; st.className='lbl'; } },100);
 // pointer interaction: tap = head / select; drag clip = move; drag edge = trim
 let drag=null;
 tl.addEventListener('wheel',e=>{ e.preventDefault(); const r=tl.getBoundingClientRect(); if(e.ctrlKey||e.metaKey) zoomAt(zoom*Math.pow(1.0015,-e.deltaY),e.clientX-r.left); else scrollX=Math.max(0,Math.min(Math.max(0,tlLen*pxPerSec()-(TW-LH)),scrollX+(Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY))); },{passive:false});
@@ -769,9 +774,10 @@ function updUndo(){ $('#t-undo').disabled=!hist.length; $('#t-redo').disabled=!r
 $('#t-undo').onclick=undo; $('#t-redo').onclick=redo; updUndo();
 document.addEventListener('keydown',e=>{ if(e.target.matches('input,select,textarea')) return; if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){ e.preventDefault(); e.shiftKey?redo():undo(); } else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){ e.preventDefault(); redo(); } });
 let slideSnap=null; document.querySelectorAll('#clipbar input[type=range]').forEach(r=>{ r.addEventListener('pointerdown',()=>{ slideSnap=snapshot(); }); r.addEventListener('change',()=>{ if(slideSnap){ hist.push(slideSnap); if(hist.length>60) hist.shift(); redoS.length=0; updUndo(); slideSnap=null; } }); });
-function renderClipbar(){ const cb=$('#clipbar'); if(!sel){ cb.hidden=true; return; } cb.hidden=false; $('#cb-name').textContent=sel.name+' · '+sel.start.toFixed(1)+'s · '+sel.len.toFixed(1)+'s'; $('#cb-gain').value=sel.gain; $('#cb-fi').value=sel.fi; $('#cb-fo').value=sel.fo; $('#cb-rep').value=sel.rep; $('#cb-rev').classList.toggle('on',sel.reverse); $('#cb-mute').classList.toggle('on',sel.muted); }
+function renderClipbar(){ const cb=$('#clipbar'); if(!sel){ cb.hidden=true; return; } cb.hidden=false; $('#cb-name').textContent=sel.name+' · '+sel.start.toFixed(1)+'s · '+sel.len.toFixed(1)+'s'; $('#cb-gain').value=sel.gain; $('#cb-fi').value=sel.fi; $('#cb-fo').value=sel.fo; $('#cb-rep').value=sel.rep; $('#cb-rev').classList.toggle('on',sel.reverse); $('#cb-smooth').classList.toggle('on',sel.smooth!==false); $('#cb-mute').classList.toggle('on',sel.muted); }
 $('#cb-gain').oninput=e=>{ if(sel){ sel.gain=+e.target.value; restartPlayback(); } }; $('#cb-fi').oninput=e=>{ if(sel){ sel.fi=+e.target.value; restartPlayback(); } }; $('#cb-fo').oninput=e=>{ if(sel){ sel.fo=+e.target.value; restartPlayback(); } };
 $('#cb-rep').oninput=e=>{ if(sel){ sel.rep=+e.target.value; sel.len=Math.min(sel.buf.duration-sel.offset,sel.len)*1; sel.len=Math.max(sel.len,0.1); if(sel.rep>1) sel.len=(sel.buf.duration-sel.offset)*sel.rep; fitWA(); restartPlayback(); renderClipbar(); } };
+$('#cb-smooth').onclick=()=>{ if(sel){ pushUndo(); sel.smooth=sel.smooth===false; restartPlayback(); renderClipbar(); toast(sel.smooth?'つなぎ目をなめらかに(余韻を頭に巻き込み)':'生のまま'); } };
 $('#cb-rev').onclick=()=>{ if(sel){ pushUndo(); sel.reverse=!sel.reverse; restartPlayback(); renderClipbar(); } }; $('#cb-mute').onclick=()=>{ if(sel){ pushUndo(); sel.muted=!sel.muted; restartPlayback(); renderClipbar(); } };
 $('#cb-dup').onclick=()=>{ if(!sel) return; pushUndo(); const c={...sel,id:Date.now()+Math.random(),start:sel.start+sel.len}; clips.push(c); sel=c; fitWA(); $('#r-n').textContent=clips.length; restartPlayback(); renderClipbar(); };
 $('#cb-del').onclick=()=>{ if(!sel) return; pushUndo(); clips=clips.filter(c=>c!==sel); sel=null; fitWA(); $('#r-n').textContent=clips.length; restartPlayback(); renderClipbar(); }; $('#cb-close').onclick=()=>{ sel=null; renderClipbar(); };
