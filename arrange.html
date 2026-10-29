@@ -43,7 +43,7 @@ button:disabled{opacity:0.35}
 #sl-nums{gap:4px} #sl-nums button{flex:1;min-height:38px;padding:6px 0;font-size:13px}
 #slicer{width:100%;height:120px;display:block;border:1px solid var(--line);touch-action:none;background:var(--bg)}
 #glide{width:100%;height:330px;display:block;border:1px solid var(--line);touch-action:none;background:var(--bg)} #glide[hidden],#glide-row[hidden]{display:none!important} .chips{display:flex;gap:5px;flex-wrap:wrap} .chips button{flex:none;padding:9px 10px;min-height:36px;font-size:11px;white-space:nowrap} .chips button.grp{border-color:var(--acc-2)} #arena[hidden],#arena-row[hidden],#grid[hidden],.pane[hidden]{display:none!important}
-.fx{display:grid;grid-template-columns:repeat(5,1fr);gap:5px} .fx button{min-height:46px;font-size:10px;touch-action:none;padding:8px 2px;letter-spacing:.02em}
+.fx{display:grid;grid-template-columns:repeat(5,1fr);gap:5px} .fx{touch-action:none} .fx button{min-height:46px;font-size:10px;touch-action:none;padding:8px 2px;letter-spacing:.02em}
 .fx button small{display:block;color:var(--dim);font-size:9px;margin-top:3px} .fx button.hold{background:var(--acc);border-color:var(--acc);color:#0a0a0b} .fx button.hold small{color:#3a2412}
 .knobs{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
 .knob{display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--dim);font-size:10px;touch-action:none;cursor:ns-resize}
@@ -576,7 +576,13 @@ function crkStep(){ if(!fx.crk||!M){ return; } const t=ac.currentTime, g=M.pre.g
   crkTimer=setTimeout(crkStep,Math.max(3,next*1000-2)); }
 function fxOn(k){ ensureAudio(); const t=ac.currentTime; if(k==='crk'){ fx.crk=true; clearTimeout(crkTimer); crkStep(); return; } fx[k]=true; if(k==='st32'||k==='st16'){ M.stD.delayTime.setValueAtTime(k==='st16'?0.125:0.0625,t); M.stFb.gain.setTargetAtTime(1,t,0.005); M.stIn.gain.setTargetAtTime(0,t,0.005); } if(k==='dive'){ M.lp.frequency.setTargetAtTime(150,t,0.25); M.clp.frequency.setTargetAtTime(150,t,0.25); } if(k==='stop'){ M.lp.frequency.setTargetAtTime(200,t,0.5); M.clp.frequency.setTargetAtTime(200,t,0.5); M.stD.delayTime.setValueAtTime(0.0625,t); M.stFb.gain.setTargetAtTime(0.97,t,0.01); M.stIn.gain.setTargetAtTime(0,t,0.01); M.stD.delayTime.linearRampToValueAtTime(0.5,t+1.2); } }
 function fxOff(k){ if(!M) return; const t=ac.currentTime; fx[k]=false; if(k==='crk'){ clearTimeout(crkTimer); M.pre.gain.cancelScheduledValues(t); M.pre.gain.setValueAtTime(M.pre.gain.value,t); M.pre.gain.linearRampToValueAtTime(1,t+0.004); return; } if(k==='st32'||k==='st16'||k==='stop'){ if(!fx.st32&&!fx.st16&&!fx.stop){ M.stFb.gain.setTargetAtTime(0,t,0.01); M.stIn.gain.setTargetAtTime(1,t,0.01); M.stD.delayTime.cancelScheduledValues(t); M.stD.delayTime.setValueAtTime(0.0625,t+0.05); } } if(k==='dive'||k==='stop') applyKnobs(); }
-document.querySelectorAll('.fx button').forEach(b=>{ const k=b.dataset.fx; const dn=e=>{ b.setPointerCapture?.(e.pointerId); b.classList.add('hold'); fxOn(k); }; const up=()=>{ if(!b.classList.contains('hold')) return; b.classList.remove('hold'); fxOff(k); }; b.addEventListener('pointerdown',dn); b.addEventListener('pointerup',up); b.addEventListener('pointercancel',up); });
+// FX row: press and slide — the effect under the finger is the one held, so you can sweep across Ratchet → Stutter → Dive …
+{ const fxRow=document.querySelector('.fx'); const held=new Map();   // pointerId → button
+  const setHeld=(id,b)=>{ const cur=held.get(id); if(cur===b) return; if(cur){ const shared=[...held.entries()].some(([pid,x])=>pid!==id&&x===cur); if(!shared){ cur.classList.remove('hold'); fxOff(cur.dataset.fx); } } if(b){ b.classList.add('hold'); fxOn(b.dataset.fx); held.set(id,b); } else held.delete(id); };
+  const under=e=>{ const el=document.elementFromPoint(e.clientX,e.clientY); return el&&el.closest?el.closest('.fx button'):null; };
+  fxRow.addEventListener('pointerdown',e=>{ const b=under(e); if(!b) return; ensureAudio(); fxRow.setPointerCapture?.(e.pointerId); setHeld(e.pointerId,b); });
+  fxRow.addEventListener('pointermove',e=>{ if(!held.has(e.pointerId)) return; const b=under(e); if(b) setHeld(e.pointerId,b); });
+  const up=e=>{ if(!held.has(e.pointerId)) return; setHeld(e.pointerId,null); }; fxRow.addEventListener('pointerup',up); fxRow.addEventListener('pointercancel',up); fxRow.addEventListener('lostpointercapture',up); }
 
 
 /* ---------- 降らす ---------- */
