@@ -181,8 +181,9 @@ input[type=range]{flex:1;min-width:60px;accent-color:var(--acc);height:28px;marg
 (()=>{
 /* no pinch / double-tap zoom on iOS */
 document.addEventListener('gesturestart',e=>e.preventDefault(),{passive:false}); document.addEventListener('gesturechange',e=>e.preventDefault(),{passive:false});
-document.addEventListener('touchmove',e=>{ if(e.touches.length>1) e.preventDefault(); },{passive:false});
-let lastTouchEnd=0; document.addEventListener('touchend',e=>{ const n=Date.now(); if(n-lastTouchEnd<350) e.preventDefault(); lastTouchEnd=n; },{passive:false});
+const isCtl=t=>!!(t&&t.closest&&t.closest('input,select,textarea,.knob,button'));
+document.addEventListener('touchmove',e=>{ if(e.touches.length>1&&![...e.touches].some(t=>isCtl(t.target))) e.preventDefault(); },{passive:false});   // block pinch-zoom, but never a second finger that is working a slider or knob
+let lastTouchEnd=0, lastTouchTgt=null; document.addEventListener('touchend',e=>{ const n=Date.now(); if(n-lastTouchEnd<350&&e.target===lastTouchTgt&&!isCtl(e.target)) e.preventDefault(); lastTouchEnd=n; lastTouchTgt=e.target; },{passive:false});
 document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
 
 const $=s=>document.querySelector(s), css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
