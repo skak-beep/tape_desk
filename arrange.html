@@ -43,7 +43,7 @@ button:disabled{opacity:0.35}
 #sl-nums{gap:4px} #sl-nums button{flex:1;min-height:38px;padding:6px 0;font-size:13px}
 #slicer{width:100%;height:120px;display:block;border:1px solid var(--line);touch-action:none;background:var(--bg)}
 #glide{width:100%;height:330px;display:block;border:1px solid var(--line);touch-action:none;background:var(--bg)} #glide[hidden],#glide-row[hidden]{display:none!important} .chips{display:flex;gap:5px;flex-wrap:wrap} .chips button{flex:none;padding:9px 10px;min-height:36px;font-size:11px;white-space:nowrap} .chips button.grp{border-color:var(--acc-2)} #arena[hidden],#arena-row[hidden],#grid[hidden],.pane[hidden]{display:none!important}
-.fx{display:grid;grid-template-columns:repeat(4,1fr);gap:6px} .fx button{min-height:46px;font-size:11px;touch-action:none;padding:8px 4px}
+.fx{display:grid;grid-template-columns:repeat(5,1fr);gap:5px} .fx button{min-height:46px;font-size:10px;touch-action:none;padding:8px 2px;letter-spacing:.02em}
 .fx button small{display:block;color:var(--dim);font-size:9px;margin-top:3px} .fx button.hold{background:var(--acc);border-color:var(--acc);color:#0a0a0b} .fx button.hold small{color:#3a2412}
 .knobs{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
 .knob{display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--dim);font-size:10px;touch-action:none;cursor:ns-resize}
@@ -177,7 +177,7 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
     </div>
     <div class="pads" id="pads"></div>
     <div class="fx">
-      <button data-fx="st32">Ratchet<small>1/32</small></button><button data-fx="st16">Stutter<small>1/16</small></button><button data-fx="dive">Dive<small>filter ↓</small></button><button data-fx="stop">Tape stop<small>pitch ↓</small></button>
+      <button data-fx="st32">Ratchet<small>1/32</small></button><button data-fx="st16">Stutter<small>1/16</small></button><button data-fx="dive">Dive<small>filter ↓</small></button><button data-fx="stop">Tape stop<small>pitch ↓</small></button><button data-fx="crk">接触不良<small>プツプツ</small></button>
     </div>
     <div class="knobs">
       <div class="knob" data-k="dark" data-min="0" data-max="100" data-v="50"><div class="k">50</div>Dark</div>
@@ -528,7 +528,7 @@ gl.addEventListener('pointermove',e=>{ const st=glPointers.get(e.pointerId); if(
   const c=Math.min(GC-1,Math.max(0,Math.floor(x/cellW()))), rr=GR-1-Math.min(GR-1,Math.max(0,Math.floor(y/cellH())));
   if(c!==st.c||rr!==st.rr){ const sp=Math.hypot(x-st.lx,y-st.ly)/Math.max(1,performance.now()-st.t); st.c=c; st.rr=rr; st.t=performance.now(); st.lx=x; st.ly=y; clearTimeout(st.timer); if(st.stop){ st.stop(); st.stop=null; } if(typeof st.last==='function') st.last(0.06); st.last=glNote(c,rr,Math.min(0.8,0.35+sp*0.35),true,true); st.timer=setTimeout(()=>{ if(glPointers.get(e.pointerId)===st&&!st.stop) st.stop=watchHold(glSwell(c,rr,0.7)); },190); } });
 const holdWatch=new Set(); function watchHold(stop){ if(typeof stop!=='function') return stop; const w={stop}; holdWatch.add(w); w.t=setTimeout(()=>{ try{stop();}catch(e){} holdWatch.delete(w); },20000); return ()=>{ clearTimeout(w.t); holdWatch.delete(w); stop(); }; }
-function stopAllHolds(){ for(const w of [...holdWatch]){ clearTimeout(w.t); try{w.stop();}catch(e){} holdWatch.delete(w); } for(const [id,st] of glPointers){ clearTimeout(st.timer); if(st.stop) try{st.stop();}catch(e){} } glPointers.clear(); for(const [id,h] of heldNames){ h.stop&&h.stop(); h.nm.classList.remove('lit'); } heldNames.clear(); }
+function stopAllHolds(){ if(fx.crk) fxOff('crk'); for(const w of [...holdWatch]){ clearTimeout(w.t); try{w.stop();}catch(e){} holdWatch.delete(w); } for(const [id,st] of glPointers){ clearTimeout(st.timer); if(st.stop) try{st.stop();}catch(e){} } glPointers.clear(); for(const [id,h] of heldNames){ h.stop&&h.stop(); h.nm.classList.remove('lit'); } heldNames.clear(); }
 document.addEventListener('visibilitychange',()=>{ if(document.hidden) stopAllHolds(); }); window.addEventListener('blur',stopAllHolds);
 const glUp=e=>{ const st=glPointers.get(e.pointerId); if(!st) return; clearTimeout(st.timer); if(st.stop) st.stop(); glPointers.delete(e.pointerId); if(st.fx&&![...glPointers.values()].some(p=>p.fx)){ setBend(0); glFxPos=null; applyDrive(); if(M) M.glp.frequency.setTargetAtTime(6000,ac.currentTime,0.1); } };
 gl.addEventListener('pointerup',glUp); gl.addEventListener('pointercancel',glUp);
@@ -565,9 +565,17 @@ function drawGlide(){ if(!GW) glResize(); if(!GW||$('#glide').hidden) return; gg
   if(glFxPos){ const px=fx0+glFxPos.u*fxW(), py=(1-glFxPos.vv)*GH; gg.fillStyle=acc; gg.beginPath(); gg.arc(px,py,7,0,6.283); gg.fill(); gg.strokeStyle=acc; gg.globalAlpha=0.4; gg.beginPath(); gg.arc(px,py,14,0,6.283); gg.stroke(); gg.globalAlpha=1; } }
 
 /* ---------- hold FX on the pad bus ---------- */
-const fx={st32:false,st16:false,dive:false,stop:false};
-function fxOn(k){ ensureAudio(); const t=ac.currentTime; fx[k]=true; if(k==='st32'||k==='st16'){ M.stD.delayTime.setValueAtTime(k==='st16'?0.125:0.0625,t); M.stFb.gain.setTargetAtTime(1,t,0.005); M.stIn.gain.setTargetAtTime(0,t,0.005); } if(k==='dive'){ M.lp.frequency.setTargetAtTime(150,t,0.25); M.clp.frequency.setTargetAtTime(150,t,0.25); } if(k==='stop'){ M.lp.frequency.setTargetAtTime(200,t,0.5); M.clp.frequency.setTargetAtTime(200,t,0.5); M.stD.delayTime.setValueAtTime(0.0625,t); M.stFb.gain.setTargetAtTime(0.97,t,0.01); M.stIn.gain.setTargetAtTime(0,t,0.01); M.stD.delayTime.linearRampToValueAtTime(0.5,t+1.2); } }
-function fxOff(k){ if(!M) return; const t=ac.currentTime; fx[k]=false; if(k==='st32'||k==='st16'||k==='stop'){ if(!fx.st32&&!fx.st16&&!fx.stop){ M.stFb.gain.setTargetAtTime(0,t,0.01); M.stIn.gain.setTargetAtTime(1,t,0.01); M.stD.delayTime.cancelScheduledValues(t); M.stD.delayTime.setValueAtTime(0.0625,t+0.05); } } if(k==='dive'||k==='stop') applyKnobs(); }
+const fx={st32:false,st16:false,dive:false,stop:false,crk:false}; let crkTimer=null;
+function crkStep(){ if(!fx.crk||!M){ return; } const t=ac.currentTime, g=M.pre.gain; g.cancelScheduledValues(t); const cur=g.value;
+  // a loose plug: mostly on, with short cut-outs, bursts of fast chatter, and the odd long dropout
+  const r=Math.random(); let next;
+  if(r<0.45){ const on=0.004+Math.random()*0.06; g.setValueAtTime(cur,t); g.linearRampToValueAtTime(1,t+0.0005); next=on; }
+  else if(r<0.8){ const off=0.003+Math.random()*0.04; g.setValueAtTime(cur,t); g.linearRampToValueAtTime(0,t+0.0004); next=off; }
+  else if(r<0.95){ let tt=t; const n=3+Math.floor(Math.random()*8), iv=0.003+Math.random()*0.006; for(let k=0;k<n;k++){ g.setValueAtTime(k%2?0:1,tt); tt+=iv; } g.setValueAtTime(1,tt); next=tt-t; }   // chatter: ツツツツ
+  else { g.setValueAtTime(cur,t); g.linearRampToValueAtTime(0,t+0.0005); next=0.12+Math.random()*0.3; }   // long dropout
+  crkTimer=setTimeout(crkStep,Math.max(3,next*1000-2)); }
+function fxOn(k){ ensureAudio(); const t=ac.currentTime; if(k==='crk'){ fx.crk=true; clearTimeout(crkTimer); crkStep(); return; } fx[k]=true; if(k==='st32'||k==='st16'){ M.stD.delayTime.setValueAtTime(k==='st16'?0.125:0.0625,t); M.stFb.gain.setTargetAtTime(1,t,0.005); M.stIn.gain.setTargetAtTime(0,t,0.005); } if(k==='dive'){ M.lp.frequency.setTargetAtTime(150,t,0.25); M.clp.frequency.setTargetAtTime(150,t,0.25); } if(k==='stop'){ M.lp.frequency.setTargetAtTime(200,t,0.5); M.clp.frequency.setTargetAtTime(200,t,0.5); M.stD.delayTime.setValueAtTime(0.0625,t); M.stFb.gain.setTargetAtTime(0.97,t,0.01); M.stIn.gain.setTargetAtTime(0,t,0.01); M.stD.delayTime.linearRampToValueAtTime(0.5,t+1.2); } }
+function fxOff(k){ if(!M) return; const t=ac.currentTime; fx[k]=false; if(k==='crk'){ clearTimeout(crkTimer); M.pre.gain.cancelScheduledValues(t); M.pre.gain.setValueAtTime(M.pre.gain.value,t); M.pre.gain.linearRampToValueAtTime(1,t+0.004); return; } if(k==='st32'||k==='st16'||k==='stop'){ if(!fx.st32&&!fx.st16&&!fx.stop){ M.stFb.gain.setTargetAtTime(0,t,0.01); M.stIn.gain.setTargetAtTime(1,t,0.01); M.stD.delayTime.cancelScheduledValues(t); M.stD.delayTime.setValueAtTime(0.0625,t+0.05); } } if(k==='dive'||k==='stop') applyKnobs(); }
 document.querySelectorAll('.fx button').forEach(b=>{ const k=b.dataset.fx; const dn=e=>{ b.setPointerCapture?.(e.pointerId); b.classList.add('hold'); fxOn(k); }; const up=()=>{ if(!b.classList.contains('hold')) return; b.classList.remove('hold'); fxOff(k); }; b.addEventListener('pointerdown',dn); b.addEventListener('pointerup',up); b.addEventListener('pointercancel',up); });
 
 
