@@ -54,6 +54,7 @@ input[type=range]{flex:1;min-width:60px;accent-color:var(--acc);height:28px;marg
 .editor .kn{flex:1 1 46%} .editor .kn span{min-width:4.2em;font-size:10px}
 .layer{display:grid;grid-template-columns:34px 1fr 90px 44px;gap:8px;align-items:center;border:1px solid var(--line);border-radius:4px;padding:8px}
 .layer .nm{color:var(--dim)} .layer .nm b{color:var(--fg);font-weight:500} .layer button{min-height:36px;padding:8px} .layer.muted{opacity:.45}
+#wake{position:fixed;inset:0;background:rgba(10,10,11,.92);display:flex;align-items:center;justify-content:center;text-align:center;z-index:20;color:var(--fg);font-size:14px;line-height:2;cursor:pointer} #wake b{color:var(--acc);font-size:18px;letter-spacing:.2em} #wake small{display:block;color:var(--dim);font-size:10px;text-transform:none;line-height:1.6;margin-top:8px} #wake[hidden]{display:none!important}
 #toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);transform:translateX(-50%);background:var(--fg);color:var(--bg);font-size:11px;padding:8px 14px;border-radius:4px;max-width:92%;text-align:center;opacity:0;transition:opacity .25s;pointer-events:none;text-transform:none;letter-spacing:.04em;z-index:9}
 #toast.show{opacity:1}
 .foot{display:flex;justify-content:space-between;color:var(--dim);font-size:10px;border-top:1px solid var(--line);padding-top:6px} .foot b{color:var(--acc);font-weight:500}
@@ -73,7 +74,7 @@ input[type=range]{flex:1;min-width:60px;accent-color:var(--acc);height:28px;marg
 <div id="app">
   <div class="top"><span class="t">構成</span>
     <div class="tabs"><span class="on" data-tab="make">作る</span><span data-tab="tl">並べる</span><span data-tab="out">出力</span></div>
-    <span class="r"><b id="r-pos">00.0</b>s · <b id="r-n">0</b> clips</span></div>
+    <span class="r"><b id="r-audio">·</b> <b id="r-pos">00.0</b>s · <b id="r-n">0</b> clips</span></div>
   <canvas id="stack"></canvas>
 
   <section class="pane on" data-pane="make">
@@ -169,6 +170,7 @@ input[type=range]{flex:1;min-width:60px;accent-color:var(--acc);height:28px;marg
   <div class="foot"><span>MAKE <b>PHRASE</b> · ARRANGE <b>CLIPS</b></span><span id="dsp">DSP 00%</span></div>
 </div>
 <div id="toast"></div>
+<div id="wake" role="button" tabindex="0"><div><b>構成</b><br>タップして音を出す<br><small>iPhone は最初の1回だけ必要です · 横のマナースイッチが消音だと鳴りません</small></div></div>
 
 <script>
 
@@ -183,7 +185,10 @@ const $=s=>document.querySelector(s), css=v=>getComputedStyle(document.documentE
 /* iOS unlock: wake the audio engine on the first touchend/click (pointerdown alone does not count on Safari) and keep nudging it while suspended */
 function unlock(){ try{ ensureAudio(); if(ac.state!=='running') ac.resume(); const b=ac.createBuffer(1,1,ac.sampleRate), src=ac.createBufferSource(); src.buffer=b; src.connect(ac.destination); src.start(0); }catch(e){} }
 ['touchend','click','keydown'].forEach(ev=>document.addEventListener(ev,unlock,{passive:true}));
-setInterval(()=>{ if(ac&&ac.state!=='running') ac.resume(); },800);
+setInterval(()=>{ if(ac&&ac.state!=='running') ac.resume(); const el=document.getElementById('r-audio'); if(el) el.textContent=ac?(ac.state==='running'?'♪':'zz'):'·'; },400);
+window._arr={get ac(){return ac},get M(){return M}};
+const wakeEl=document.getElementById('wake'); const wakeTap=()=>{ unlock(); setTimeout(()=>{ if(ac&&ac.state==='running'){ wakeEl.hidden=true; } },150); setTimeout(()=>{ if(ac&&ac.state==='running') wakeEl.hidden=true; },700); };
+wakeEl.addEventListener('touchend',wakeTap,{passive:true}); wakeEl.addEventListener('click',wakeTap);
 let toastT; const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600);};
 document.querySelectorAll('.tabs span').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tabs span').forEach(x=>x.classList.toggle('on',x===t));document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===t.dataset.tab));});
 const KEYS=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; let key=0; const hz=m=>440*Math.pow(2,(m-69)/12), root=()=>48+key;
