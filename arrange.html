@@ -25,14 +25,19 @@ body[data-mode=glide]{--mc:#ff7a5a} body[data-mode=step]{--mc:#45a6ff}
 .cap{font-size:10px;color:var(--dim);letter-spacing:.14em;text-transform:uppercase;min-width:3.2em} .grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px 8px;border:1px solid var(--line);border-radius:10px;background:var(--bg-2)} .grp button{min-height:38px;padding:8px 11px;font-size:11px;background:transparent}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--bg-2)} .seg button{border:0;border-radius:0;min-height:38px;padding:8px 12px;font-size:11px;color:var(--dim);background:transparent} .seg button+button{border-left:1px solid var(--line)} .seg button.on{background:var(--bg-3);color:var(--fg);font-weight:600;box-shadow:inset 0 -2px 0 var(--mc)}
 .between{justify-content:space-between}
-#glide-row{margin-top:-10px} #glide-row>*+*{margin-top:10px}
-/* folder tabs hanging from the bottom edge of the surface */
-.gtabs{display:flex;justify-content:space-between;align-items:flex-start;padding:0 10px;position:relative;z-index:1}
-.gtabs .seg{display:flex;gap:3px;border:0;background:transparent;border-radius:0;overflow:visible}
-.gtabs .seg button{flex:none;min-height:30px;padding:6px 13px;font-size:11px;letter-spacing:.04em;border:1px solid var(--line);border-top:0;border-radius:0 0 9px 9px;background:#0f0f17;color:var(--dim);margin-top:-1px;box-shadow:none;transition:background .15s,color .15s}
-.gtabs .seg button+button{border-left:1px solid var(--line)}
-.gtabs .seg button.on{min-height:34px;background:linear-gradient(to bottom,var(--bg-2) 0%,color-mix(in srgb,var(--mc) 30%,var(--bg-2)) 100%);color:var(--fg);font-weight:600;border-color:color-mix(in srgb,var(--mc) 60%,var(--line));box-shadow:0 4px 12px -6px var(--mc)}
-.gtabs .seg button.on::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--mc);margin-right:6px;vertical-align:1px} .eye{vertical-align:-3px;margin-right:4px}
+#glide-row>*+*{margin-top:10px}
+/* the surface sits on a filled plate; the active tab is the same plate flowing out of its bottom edge with concave fillets */
+.gwrap{display:flex;flex-direction:column;--pf:color-mix(in srgb,var(--mc) 40%,#17151f)} .gwrap[hidden]{display:none!important}
+.plate{background:var(--pf);border-radius:18px;padding:6px;transition:background .2s}
+.plate #glide{border:0!important;border-radius:12px!important;box-shadow:none!important}
+body.rec .plate{background:var(--rec)}
+.gtabs{display:flex;justify-content:space-between;align-items:flex-start;padding:0 30px}
+.gtabs .seg{display:flex;gap:14px;align-items:flex-start;border:0;background:transparent;border-radius:0;overflow:visible}
+.gtabs .seg button{position:relative;flex:none;border:0!important;border-radius:14px;min-height:30px;padding:6px 14px;margin-top:7px;background:#17171f;color:var(--dim);font-size:11px;letter-spacing:.04em;box-shadow:none}
+.gtabs .seg button.on{margin-top:0;border-radius:0 0 14px 14px;min-height:38px;padding:9px 16px 8px;background:var(--pf);color:var(--fg);font-weight:600;box-shadow:none}
+.gtabs .seg button.on::before,.gtabs .seg button.on::after{content:"";position:absolute;top:0;width:14px;height:14px;pointer-events:none}
+.gtabs .seg button.on::before{left:-14px;background:radial-gradient(circle at 0 100%,transparent 13.5px,var(--pf) 14px)}
+.gtabs .seg button.on::after{right:-14px;background:radial-gradient(circle at 100% 100%,transparent 13.5px,var(--pf) 14px)} .eye{vertical-align:-3px;margin-right:4px}
 .grp button.on{background:var(--mc);border-color:var(--mc);color:#0a0a14}
 /* grid: 8 rows, each = name | rate | 16 steps */
 .grid{display:flex;flex-direction:column;gap:3px}
@@ -166,12 +171,13 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
       <span class="rl"><button data-rl="4">4</button><button data-rl="8" class="on">8</button><button data-rl="15">15</button><button data-rl="30">30</button><button data-rl="0">∞</button></span>
       <button id="b-micclip">● Mic</button><span id="rec-status" class="lbl">READY</span>
     </div>
-    <canvas id="glide" hidden></canvas>
-    <div id="glide-row" hidden>
+    <div class="gwrap" id="glide-wrap" hidden><div class="plate"><canvas id="glide" hidden></canvas></div>
       <div class="gtabs">
         <div class="seg" id="seg-strip"><button data-strip="fx" class="on">FX</button><button data-strip="bend">ベンド</button></div>
         <div class="seg" id="seg-view"><button data-view="grid" class="on">グリッド</button><button data-view="kbd">鍵盤</button></div>
       </div>
+    </div>
+    <div id="glide-row" hidden>
       <div class="row between">
         <div class="grp" id="grp-play"><span class="cap">演奏</span><button id="gl-scale">ペンタ</button><button id="gl-chord">和音</button><button id="gl-rand">乱</button><button id="gl-seed">種</button></div>
         <div class="grp" id="grp-tone"><span class="cap">音色</span><button id="b-mac">開く</button></div>
@@ -446,7 +452,7 @@ const gridEl=$('#grid'), padsEl=$('#pads'); const heldCells=new Set();
 const dbl=(el,fn)=>{ let t=0; el.addEventListener('pointerdown',e=>{ const n=performance.now(); if(n-t<380){ t=0; fn(e); } else t=n; }); };
 const MULTS=[0.25,0.5,1,2,4], multLabel=m=>m===0.25?'¼':m===0.5?'½':'×'+m;
 function build(){ document.body.dataset.mode=mode; document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('on',b.dataset.mode===mode)); INSTR.forEach(it=>{ if(it.kind==='p') SETS[it.id].pads.forEach((p,i)=>p.l=KEYS[(key+PENTA[i])%12]); });
-  const isGlide=mode==='glide'; $('#glide').hidden=!isGlide; $('#glide-row').hidden=!isGlide; gridEl.hidden=isGlide; $('#step-row').hidden=isGlide; $('#step-hint').hidden=isGlide; padsEl.hidden=isGlide; if(isGlide){ $('#editor').hidden=true; requestAnimationFrame(glResize); } else if(editMode) openEditor(selPad()); renderInstr();
+  const isGlide=mode==='glide'; $('#glide').hidden=!isGlide; $('#glide-wrap').hidden=!isGlide; $('#glide-row').hidden=!isGlide; gridEl.hidden=isGlide; $('#step-row').hidden=isGlide; $('#step-hint').hidden=isGlide; padsEl.hidden=isGlide; if(isGlide){ $('#editor').hidden=true; requestAnimationFrame(glResize); } else if(editMode) openEditor(selPad()); renderInstr();
   gridEl.innerHTML=''; padsEl.innerHTML='';
   SETS[curSet].pads.forEach((p,i)=>{
     const rw=document.createElement('div'); rw.className='rw'; rw.innerHTML=`<div class="ms"><button class="m ${p.mute?'off':''}">◉</button><button class="s ${p.solo?'on':''}">S</button></div><div class="nm">${p.l}</div><div class="rt">${multLabel(p.mult)}</div><div class="cells">${Array.from({length:16},(_,k)=>`<div class="c ${k%4===0?'b4':''}" data-k="${k}"></div>`).join('')}</div>`;
