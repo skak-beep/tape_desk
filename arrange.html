@@ -14,7 +14,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--mono);font-
 .top .r{margin-left:auto;color:var(--dim);font-size:11px;white-space:nowrap} .top .r b{color:var(--fg);font-weight:500} .top .r b.rec{color:var(--rec)}
 #stack{width:100%;height:70px;display:block;border:1px solid var(--line)}
 button:disabled{opacity:0.35}
-.recbar{display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:5;background:var(--bg);padding:4px 0} .recbar .rl,#grain-src .rl{display:flex;gap:3px} #grain-src .rl button{min-height:36px;padding:8px 9px;font-size:11px} .recbar .rl button{min-height:36px;padding:8px 9px;font-size:11px} .recbar #b-rec-top{min-height:40px;padding:8px 14px} .recbar .lbl{margin-left:auto;font-size:11px;color:var(--fg);white-space:nowrap;text-align:right} .recbar .lbl.rec{color:var(--rec)} .recbar .lbl.cnt{color:var(--acc);font-size:16px;font-weight:600}
+.recbar{display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:5;background:var(--bg);padding:4px 0} .recbar .rl,#grain-src .rl{display:flex;gap:3px} #grain-src .rl button{min-height:36px;padding:8px 9px;font-size:11px} .recbar .rl button{min-height:36px;padding:8px 9px;font-size:11px} .recbar #b-rec-top{min-height:40px;padding:8px 14px} .recbar #m-tl{min-height:36px;padding:8px 9px;font-size:11px} .recbar .lbl{margin-left:auto;font-size:11px;color:var(--fg);white-space:nowrap;text-align:right} .recbar .lbl.rec{color:var(--rec)} .recbar .lbl.cnt{color:var(--acc);font-size:16px;font-weight:600}
 #glide.rec{border-color:var(--rec);box-shadow:0 0 0 1px var(--rec) inset}
 .pane{display:none;flex-direction:column;gap:10px}.pane.on{display:flex}
 .sets{display:flex;gap:5px} .sets button{flex:1;padding:10px 2px;min-height:40px;font-size:12px}
@@ -90,7 +90,7 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
     <div class="recbar">
       <button id="b-rec-top" class="recbtn">● Rec</button>
       <span class="rl"><button data-rl="4">4</button><button data-rl="8" class="on">8</button><button data-rl="15">15</button><button data-rl="30">30</button><button data-rl="0">∞</button></span>
-      <span id="rec-status" class="lbl">READY</span>
+      <button id="m-tl">▶ 並べた音</button><span id="rec-status" class="lbl">READY</span>
     </div>
     <div class="sets" id="mode"><button data-mode="glide" class="on">なぞる</button><button data-mode="step">ステップ</button></div>
     <div class="chips" id="instr"></div>
@@ -166,7 +166,7 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
     <div class="lbl" style="text-transform:none;margin:2px 0">上の帯=ワークエリア(ドラッグで範囲、タップで全体)・ 目盛り=再生位置をドラッグ ・ 2本指でズーム / 1本指でスクロール</div>
     <div class="tlbar">
       <button id="t-play" class="primary">▶ Play</button><button id="t-loop">Loop</button><button id="t-head0">|◀</button>
-      <button id="t-zoomout">−</button><button id="t-zoomin">+</button><button id="t-undo" title="Undo">↶</button><button id="t-redo" title="Redo">↷</button>
+      <button id="t-undo">↶ 戻す</button><button id="t-redo">↷ やり直す</button>
       <select id="t-snap" aria-label="snap"><option value="0">Snap off</option><option value="0.5" selected>Snap 0.5s</option><option value="1">Snap 1s</option><option value="2">Snap 2s</option></select>
       <select id="t-len" aria-label="length"><option value="30">30s</option><option value="60" selected>60s</option><option value="90">90s</option><option value="120">120s</option></select>
     </div>
@@ -659,10 +659,11 @@ function setRecUI(on){ if(!on) bandHide(); for(const id of ['#b-rec','#b-rec-top
 function recWithCount(){ ensureAudio(); if(recording){ rec(false); return; } if(counting){ clearTimeout(countTimer); counting=false; bandHide(); return; }
   countIn(()=>rec(true),'フレーズ録音まで'); }
 $('#b-rec-top').onclick=recWithCount;
-let recName=null;
+$('#m-tl').onclick=()=>{ ensureAudio(); if(tlPlaying){ tlPlay(false); return; } if(!clips.length){ toast('並べる にクリップがありません'); return; } if(!tlLoop){ tlLoop=true; $('#t-loop').classList.add('on'); } head=wa.s; tlPlay(true); };
+let recName=null, recWithTL=false;
 function rec(on,opt){ ensureAudio(); if(on===recording) return; if(on&&typeof slAutoSet==='function'&&slAuto) slAutoSet(false); recording=on; setRecUI(on); opt=opt||{};
-  if(on){ const len=opt.len||recLen; recMax=Math.floor((len||120)*ac.sampleRate); recL=new Float32Array(recMax); recR=new Float32Array(recMax); recIdx=0; recStart=opt.start||ac.currentTime+0.05; recName=opt.name||null; capOn(true); if(opt.len) return; toast(recLen?recLen+'秒 録音中':'録音中(■で止める)'); return; }
-  capOn(false);
+  if(on){ const len=opt.len||recLen; recMax=Math.floor((len||120)*ac.sampleRate); recL=new Float32Array(recMax); recR=new Float32Array(recMax); recIdx=0; recStart=opt.start||ac.currentTime+0.05; recName=opt.name||null; capOn(true); recWithTL=tlPlaying; if(recWithTL){ tlPlay(false); head=wa.s; tlPlay(true,recStart); } if(opt.len) return; toast(recLen?recLen+'秒 録音中':'録音中(■で止める)'); return; }
+  capOn(false); if(recWithTL){ recWithTL=false; if(tlPlaying) tlPlay(false); head=wa.s; }
   if(recL){ const n=Math.max(1,recIdx); let peak=0; for(let i=0;i<n;i+=53) peak=Math.max(peak,Math.abs(recL[i]),Math.abs(recR[i])); if(peak<0.003||n<ac.sampleRate*0.2){ toast('何も鳴らなかったので、フレーズは作りませんでした'); recL=recR=null; return; }
     const buf=ac.createBuffer(2,n,ac.sampleRate); buf.copyToChannel(recL.subarray(0,n),0); buf.copyToChannel(recR.subarray(0,n),1); recL=recR=null; addClip(buf,recName||(mode==='glide'?instr.name:'ステップ')); recName=null; } }
 function capOn(on){ if(!ac) return; if(capNode){ capNode.port.postMessage({on}); return; } if(on){ if(!proc){ proc=ac.createScriptProcessor(2048,2,1); proc.onaudioprocess=onCapture; } M.pre.connect(proc); proc.connect(capSink); } else if(proc){ try{ M.pre.disconnect(proc); proc.disconnect(); }catch(e){} } }
@@ -688,13 +689,13 @@ function scheduleClips(ctx,dest,from,now){ const nodes=[]; if(ctx===ac&&M) M.lay
     g.gain.setValueAtTime(0.0001,t0); if(skip<fi) g.gain.linearRampToValueAtTime(G,now+(cs+fi-from)); else g.gain.setValueAtTime(G,t0);
     const foStart=now+(cs+total-fo-from); if(fo>0&&foStart>t0){ g.gain.setValueAtTime(G,foStart); g.gain.linearRampToValueAtTime(0.0001,now+(cs+total-from)); } else if(fo===0){ g.gain.setValueAtTime(0,now+(cs+total-from)); }
     nodes.push(src); } return nodes; }
-function tlPlay(on){ ensureAudio(); if(tlPlaying){ playing_nodes.forEach(n=>{try{n.stop();}catch(e){}}); playing_nodes=[]; head=tlPos(); } tlPlaying=on; $('#t-play').textContent=on?'■ Stop':'▶ Play'; $('#t-play').classList.toggle('on',on);
-  if(on){ if(head<wa.s||head>=wa.e-0.05) head=wa.s; tlStartAt=ac.currentTime+0.05; tlHeadAt=head; playing_nodes=scheduleClips(ac,M.master,head,tlStartAt); } }
+function tlPlay(on,at){ ensureAudio(); if(tlPlaying){ playing_nodes.forEach(n=>{try{n.stop();}catch(e){}}); playing_nodes=[]; head=tlPos(); } tlPlaying=on; $('#t-play').textContent=on?'■ Stop':'▶ Play'; $('#t-play').classList.toggle('on',on);
+  if(on){ if(head<wa.s||head>=wa.e-0.05) head=wa.s; tlStartAt=at||ac.currentTime+0.05; tlHeadAt=head; playing_nodes=scheduleClips(ac,M.master,head,tlStartAt); } syncTLButtons(); }
 function restartPlayback(){ if(!tlPlaying) return; const p=tlPos(); playing_nodes.forEach(n=>{try{n.stop();}catch(e){}}); tlStartAt=ac.currentTime+0.02; tlHeadAt=p; playing_nodes=scheduleClips(ac,M.master,p,tlStartAt); }
 function tlPos(){ return tlPlaying?tlHeadAt+Math.max(0,ac.currentTime-tlStartAt):head; }
-$('#t-play').onclick=()=>tlPlay(!tlPlaying); $('#t-loop').onclick=()=>{ tlLoop=!tlLoop; $('#t-loop').classList.toggle('on',tlLoop); }; $('#t-head0').onclick=()=>{ head=wa.s; if(tlPlaying){ tlPlay(false); tlPlay(true); } };
+$('#t-play').onclick=()=>tlPlay(!tlPlaying); $('#t-loop').onclick=()=>{ tlLoop=!tlLoop; $('#t-loop').classList.toggle('on',tlLoop); }; $('#t-head0').onclick=()=>{ if(tlPlaying){ tlPlay(false); head=wa.s; tlPlay(true); } else head=wa.s; };
 $('#t-len').onchange=e=>{ tlLen=+e.target.value; if(wa.full||wa.e>tlLen) wa.e=tlLen; wa.s=Math.min(wa.s,wa.e-1); }; function zoomAt(z,px){ const t=tOf(px); zoom=Math.max(0.5,Math.min(16,z)); scrollX=Math.max(0,Math.min(Math.max(0,tlLen*pxPerSec()-(TW-LH)),t*pxPerSec()-(px-LH))); }
-$('#t-zoomin').onclick=()=>zoomAt(zoom*1.5,LH+(TW-LH)/2); $('#t-zoomout').onclick=()=>zoomAt(zoom/1.5,LH+(TW-LH)/2);
+
 
 /* ---------- timeline canvas ---------- */
 const tl=$('#tl'), tg=tl.getContext('2d'); let TW=0,TH=0;
@@ -724,8 +725,9 @@ function drawTL(){ if(!document.querySelector('.pane[data-pane="tl"]').classList
   // playhead (follow it when zoomed in)
   if(tlPlaying&&!drag){ const px=xOf(tlPos()); if(px>TW-30||px<LH) scrollX=Math.max(0,Math.min(tlLen*pxPerSec()-(TW-LH),tlPos()*pxPerSec()-30)); }
   const hx=xOf(tlPos()); tg.fillStyle=fg; tg.fillRect(hx-0.5,0,1.5,TH); tg.fillStyle=acc; tg.beginPath(); tg.moveTo(hx-6,WAH); tg.lineTo(hx+6,WAH); tg.lineTo(hx,WAH+9); tg.fill();
-  if(tlPlaying){ const p=tlPos(); if(p>=wa.e){ if(tlLoop){ head=wa.s; tlPlay(false); tlPlay(true); } else { tlPlay(false); head=wa.s; } } }
   $('#r-pos').textContent=tlPos().toFixed(1).padStart(4,'0'); }
+function tlTick(){ if(!tlPlaying) return; const p=tlPos(); if(p>=wa.e){ if(tlLoop&&!recording){ tlPlay(false); head=wa.s; tlPlay(true); } else { tlPlay(false); head=wa.s; } } $('#r-pos').textContent=tlPos().toFixed(1).padStart(4,'0'); syncTLButtons(); }
+function syncTLButtons(){ const b=$('#m-tl'); if(b){ b.classList.toggle('on',tlPlaying); b.textContent=tlPlaying?'■ 並べた音':'▶ 並べた音'; } }
 setInterval(()=>{ const st=$('#rec-status'); if(counting||micJob||micCancel) return; if(recording&&ac){ const el=Math.max(0,ac.currentTime-recStart); st.textContent='● '+el.toFixed(1)+(recLen?'/'+recLen:'')+'s'; st.className='lbl rec'; bandShow('● REC '+el.toFixed(1)+'s'+(recLen?' / '+recLen+'s':'')+'<small>'+(recName||'フレーズを録音中 — もう一度押すと停止')+'</small>'); } else { st.textContent=recLen?recLen+'s':'∞'; st.className='lbl'; } },100);
 // pointer interaction: tap = head / select; drag clip = move; drag edge = trim
 let drag=null;
@@ -768,7 +770,7 @@ $('#cb-del').onclick=()=>{ if(!sel) return; pushUndo(); clips=clips.filter(c=>c!
 
 /* ---------- stack view (top): small overview of the timeline ---------- */
 const cv=$('#stack'), g=cv.getContext('2d'); let W=0,H=0; function resize(){ const r=cv.getBoundingClientRect(); const d=Math.min(2,devicePixelRatio||1); W=r.width;H=r.height; cv.width=W*d; cv.height=H*d; g.setTransform(d,0,0,d,0,0); } new ResizeObserver(resize).observe(cv); resize();
-function frame(now){ requestAnimationFrame(frame); drawGlide(); drawSlicer(); g.clearRect(0,0,W,H); const lh=(H-4)/LANES; for(const c of clips){ g.fillStyle=c.color; g.globalAlpha=c.muted?0.25:0.8; g.fillRect(c.start/tlLen*W,2+c.lane*lh,Math.max(2,c.len/tlLen*W),lh-1); } g.globalAlpha=1; g.fillStyle=css('--fg'); g.fillRect(tlPos()/tlLen*W-0.5,0,1,H); if(recording){ g.strokeStyle=css('--rec'); g.strokeRect(0.5,0.5,W-1,H-1); } drawTL(); $('#dsp').textContent='DSP '+String(Math.min(99,10+clips.length*4+(P.rev*0.2|0))).padStart(2,'0')+'%'; }
+function frame(now){ requestAnimationFrame(frame); tlTick(); drawGlide(); drawSlicer(); g.clearRect(0,0,W,H); const lh=(H-4)/LANES; for(const c of clips){ g.fillStyle=c.color; g.globalAlpha=c.muted?0.25:0.8; g.fillRect(c.start/tlLen*W,2+c.lane*lh,Math.max(2,c.len/tlLen*W),lh-1); } g.globalAlpha=1; g.fillStyle=css('--fg'); g.fillRect(tlPos()/tlLen*W-0.5,0,1,H); if(recording){ g.strokeStyle=css('--rec'); g.strokeRect(0.5,0.5,W-1,H-1); } drawTL(); $('#dsp').textContent='DSP '+String(Math.min(99,10+clips.length*4+(P.rev*0.2|0))).padStart(2,'0')+'%'; }
 requestAnimationFrame(frame);
 
 /* ---------- export ---------- */
