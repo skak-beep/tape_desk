@@ -25,13 +25,14 @@ body[data-mode=glide]{--mc:#ff7a5a} body[data-mode=step]{--mc:#45a6ff}
 .cap{font-size:10px;color:var(--dim);letter-spacing:.14em;text-transform:uppercase;min-width:3.2em} .grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px 8px;border:1px solid var(--line);border-radius:10px;background:var(--bg-2)} .grp button{min-height:38px;padding:8px 11px;font-size:11px;background:transparent}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--bg-2)} .seg button{border:0;border-radius:0;min-height:38px;padding:8px 12px;font-size:11px;color:var(--dim);background:transparent} .seg button+button{border-left:1px solid var(--line)} .seg button.on{background:var(--bg-3);color:var(--fg);font-weight:600;box-shadow:inset 0 -2px 0 var(--mc)}
 .between{justify-content:space-between}
-#glide{border-radius:10px 10px 0 0!important;border-bottom-color:transparent!important}
 #glide-row{margin-top:-10px} #glide-row>*+*{margin-top:10px}
-.gtabs{display:grid;grid-template-columns:max(54px,20%) 1fr;gap:0}
-.gtabs .seg{display:flex;border-radius:0;border-top:0;background:var(--bg)} .gtabs .seg button{flex:1;min-height:40px;font-size:12px;background:var(--bg);color:var(--dim);border-top:1px solid var(--line)}
-.gtabs #seg-strip{border-radius:0 0 0 10px;border-right:0} .gtabs #seg-view{border-radius:0 0 10px 0}
-.gtabs .seg button.on{background:var(--bg-2);color:var(--fg);font-weight:600;border-top-color:transparent;box-shadow:inset 0 -2px 0 var(--mc)}
-.gtabs #seg-strip button{padding:8px 0;font-size:10px;letter-spacing:0;white-space:nowrap;min-width:0} .eye{vertical-align:-3px;margin-right:4px}
+/* folder tabs hanging from the bottom edge of the surface */
+.gtabs{display:flex;justify-content:space-between;align-items:flex-start;padding:0 10px;position:relative;z-index:1}
+.gtabs .seg{display:flex;gap:3px;border:0;background:transparent;border-radius:0;overflow:visible}
+.gtabs .seg button{flex:none;min-height:30px;padding:6px 13px;font-size:11px;letter-spacing:.04em;border:1px solid var(--line);border-top:0;border-radius:0 0 9px 9px;background:#0f0f17;color:var(--dim);margin-top:-1px;box-shadow:none;transition:background .15s,color .15s}
+.gtabs .seg button+button{border-left:1px solid var(--line)}
+.gtabs .seg button.on{min-height:34px;background:linear-gradient(to bottom,var(--bg-2) 0%,color-mix(in srgb,var(--mc) 30%,var(--bg-2)) 100%);color:var(--fg);font-weight:600;border-color:color-mix(in srgb,var(--mc) 60%,var(--line));box-shadow:0 4px 12px -6px var(--mc)}
+.gtabs .seg button.on::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--mc);margin-right:6px;vertical-align:1px} .eye{vertical-align:-3px;margin-right:4px}
 .grp button.on{background:var(--mc);border-color:var(--mc);color:#0a0a14}
 /* grid: 8 rows, each = name | rate | 16 steps */
 .grid{display:flex;flex-direction:column;gap:3px}
@@ -409,7 +410,7 @@ function wood(f0,v,pn,pp,at){ pp=pp||PP(); const t=at||ac.currentTime, o=ac.crea
 function chirp(v,pn,pp,at){ pp=pp||PP(); const t=at||ac.currentTime, o=ac.createOscillator(), g=ac.createGain(); o.type='sine'; const f0=(1300+v*1400)*Math.pow(2,pp.pitch/12), len=(0.15+v*0.25)*pp.decay; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f0*(1.6+pp.tone*1.6),t+len); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.15*pp.level,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+len); o.connect(g).connect(gate(t,len,pp,pn)); revSend(g,1.2*pp.rev); o.start(t); o.stop(t+len+0.05); }
 
 const INSTR=[
-  {id:'vpiano',name:'鍵盤(動画)',kind:'p',voice:'vpiano',m:{rev:0.35,bright:0.5}},
+  {id:'vpiano',name:'鍵盤',kind:'p',voice:'vpiano',m:{rev:0.35,bright:0.5}},
   {id:'sparkle',name:'きらめき',kind:'p',voice:'sparkle',m:{rev:0.6,dec:0.5}},{id:'bed',name:'床コード',kind:'p',voice:'bed',m:{rev:0.45,bright:0.4,oct:0}},
   {id:'pluck',name:'Pluck',kind:'p',voice:'pluck'},{id:'glass',name:'Glass',kind:'p',voice:'glass'},{id:'piano',name:'Piano',kind:'p',voice:'piano'},{id:'box',name:'Music box',kind:'p',voice:'box'},{id:'chime',name:'Chime',kind:'p',voice:'chime'},{id:'harp',name:'Harp',kind:'p',voice:'harp'},{id:'bell',name:'Bell',kind:'p',voice:'bell'},{id:'pad',name:'Pad',kind:'p',voice:'pad'},
   {id:'revgtr',name:'逆ギター',kind:'p',voice:'revgtr',m:{bright:0.5,rev:0.7,att:0.5,spread:0.4}},{id:'tapeKeys',name:'テープ鍵盤',kind:'p',voice:'tapeKeys',m:{wob:0.35,bright:0.4}},{id:'choir',name:'カセット合唱',kind:'p',voice:'choir',m:{wob:0.25,att:0.7}},{id:'organ',name:'VHSオルガン',kind:'p',voice:'organ',m:{wob:0.15}},{id:'bass',name:'ベース',kind:'p',voice:'bass',m:{oct:0}},{id:'drone',name:'ドローン',kind:'p',voice:'drone',m:{rev:0.5}},{id:'sub',name:'サブ',kind:'p',voice:'sub',m:{oct:-1,rev:0.2}},{id:'robo',name:'ロボ',kind:'p',voice:'robo',m:{wob:0.2,bright:0.4,rev:0.35,dec:0.5}},
