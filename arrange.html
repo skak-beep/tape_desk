@@ -28,10 +28,15 @@ body[data-mode=glide]{--mc:#ff7a5a} body[data-mode=step]{--mc:#45a6ff}
 #glide-row>*+*{margin-top:10px}
 /* the surface sits on a filled plate; the active tab is the same plate flowing out of its bottom edge with concave fillets */
 .gwrap{display:flex;flex-direction:column;--pf:color-mix(in srgb,var(--mc) 40%,#17151f)} .gwrap[hidden]{display:none!important}
-.plate{background:var(--pf);border-radius:18px;padding:6px;transition:background .2s}
-.plate #glide{border:0!important;border-radius:12px!important;box-shadow:none!important}
-body.rec .plate{background:var(--rec)}
-.gtabs{display:flex;justify-content:space-between;align-items:flex-start;padding:0 30px}
+.plate{position:relative;padding:6px;--sw:72px;--gap:20px}
+.plate>canvas{position:relative;z-index:1}
+.plate #glide{border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important}
+.pl-l,.pl-r{position:absolute;top:0;border-radius:18px;transition:background .2s}
+.pl-l{left:0;width:calc(var(--sw) + 12px);bottom:-46px;background:#272538;display:flex;align-items:flex-end;justify-content:center;padding:0 0 7px;box-sizing:border-box}
+.pl-r{left:calc(var(--sw) + var(--gap));right:0;bottom:0;background:var(--pf)}
+body.rec .pl-l,body.rec .pl-r{background:var(--rec)}
+.pl-l .seg{display:flex;gap:2px;background:#1a1926;border:0;border-radius:10px;padding:2px;width:calc(100% - 12px)} .pl-l .seg button{flex:1;min-height:28px;padding:4px 0;font-size:10px;letter-spacing:0;border:0;border-radius:8px;background:transparent;color:var(--dim);box-shadow:none} .pl-l .seg button.on{background:#4a4566;color:#fff;font-weight:600;box-shadow:none}
+.gtabs{display:flex;justify-content:flex-end;align-items:flex-start;padding:0 34px 0 0;min-height:46px}
 .gtabs .seg{display:flex;gap:14px;align-items:flex-start;border:0;background:transparent;border-radius:0;overflow:visible}
 .gtabs .seg button{position:relative;flex:none;border:0!important;border-radius:14px;min-height:30px;padding:6px 14px;margin-top:7px;background:#17171f;color:var(--dim);font-size:11px;letter-spacing:.04em;box-shadow:none}
 .gtabs .seg button.on{margin-top:0;border-radius:0 0 14px 14px;min-height:38px;padding:9px 16px 8px;background:var(--pf);color:var(--fg);font-weight:600;box-shadow:none}
@@ -171,11 +176,9 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
       <span class="rl"><button data-rl="4">4</button><button data-rl="8" class="on">8</button><button data-rl="15">15</button><button data-rl="30">30</button><button data-rl="0">∞</button></span>
       <button id="b-micclip">● Mic</button><span id="rec-status" class="lbl">READY</span>
     </div>
-    <div class="gwrap" id="glide-wrap" hidden><div class="plate"><canvas id="glide" hidden></canvas></div>
-      <div class="gtabs">
-        <div class="seg" id="seg-strip"><button data-strip="fx" class="on">FX</button><button data-strip="bend">ベンド</button></div>
-        <div class="seg" id="seg-view"><button data-view="grid" class="on">グリッド</button><button data-view="kbd">鍵盤</button></div>
-      </div>
+    <div class="gwrap" id="glide-wrap" hidden>
+      <div class="plate"><div class="pl-l"><div class="seg" id="seg-strip"><button data-strip="fx" class="on">FX</button><button data-strip="bend">ベンド</button></div></div><div class="pl-r"></div><canvas id="glide" hidden></canvas></div>
+      <div class="gtabs"><div class="seg" id="seg-view"><button data-view="grid" class="on">グリッド</button><button data-view="kbd">鍵盤</button></div></div>
     </div>
     <div id="glide-row" hidden>
       <div class="row between">
@@ -497,9 +500,9 @@ $('#b-seq2clip').onclick=()=>{ ensureAudio(); if(recording){ rec(false); return;
 function applyDrive(){ if(!M) return; const u=instr.mac.drive; M.gdrive.curve=u<0.03?new Float32Array([-1,0,1]):satCurve(Math.pow(u,2)*0.9); }
 const gl=$('#glide'), gg=gl.getContext('2d'); let GW=0,GH=0; const GC=6, GR=6; let glScale='penta';
 const SC={penta:[0,3,5,7,10],minor:[0,2,3,5,7,8,10]};
-function glResize(){ const r=gl.getBoundingClientRect(); if(!r.width) return; const d=Math.min(2,devicePixelRatio||1); GW=r.width;GH=r.height; gl.width=GW*d; gl.height=GH*d; gg.setTransform(d,0,0,d,0,0); }
+function glResize(){ const r=gl.getBoundingClientRect(); if(!r.width) return; const d=Math.min(2,devicePixelRatio||1); GW=r.width;GH=r.height; gl.width=GW*d; gl.height=GH*d; gg.setTransform(d,0,0,d,0,0); const pl=gl.parentElement; if(pl){ pl.style.setProperty('--sw',fxW()+'px'); pl.style.setProperty('--gap',GAP+'px'); } }
 new ResizeObserver(glResize).observe(gl);
-const fxW=()=>Math.max(54,GW*0.2), OX=()=>fxW(), GWg=()=>GW-fxW(), cellW=()=>(GW-fxW())/GC, cellH=()=>GH/GR;
+const GAP=20, fxW=()=>Math.max(54,(GW-GAP)*0.2), OX=()=>fxW()+GAP, GWg=()=>GW-fxW()-GAP, cellW=()=>GWg()/GC, cellH=()=>GH/GR;
 function cellSemi(c,r){ const sc=SC[glScale], step=glScale==='penta'?2:3; const deg=c+step*r; return 12*Math.floor(deg/sc.length)+sc[deg%sc.length]-12; }  // from C3 up ~2.5 octaves
 const glPointers=new Map(); let glTone=0.5, glChord=false, randMode=false, glKbd=false, kbdOct=0, stripFx=true; const lit=new Map();
 const stripZone=y=>Math.min(FXL.length-1,Math.max(0,Math.floor(y/GH*FXL.length)));
@@ -552,6 +555,7 @@ function glSwell(c,r,v){ const m=instr.mac, pn=(c-(GC-1)/2)/(GC-1)*1.4*m.spread,
   return null; }
 function glHit(e){ const r=gl.getBoundingClientRect(); return {x:e.clientX-r.left,y:e.clientY-r.top}; }
 gl.addEventListener('pointerdown',e=>{ ensureAudio(); gl.setPointerCapture(e.pointerId); const {x:xr,y}=glHit(e); const x=xr-OX();
+  if(xr>=fxW()&&xr<OX()) return;
   if(xr<fxW()){ if(stripFx){ const st={fx:true,strip:true,k:null}; glPointers.set(e.pointerId,st); stripHold(st,y); return; } glPointers.set(e.pointerId,{fx:true}); glFx(xr,y); return; }
   if(randMode){ const st={fx:false,rand:true,rx:Math.max(0,x),ry:y,stop:null}; glPointers.set(e.pointerId,st); st.stop=watchHold(randStart(st)); return; }
   if(isKbd()){ const sm=kbdSemi(Math.max(0,x),y), pn=(x/GWg()-0.5)*1.2*instr.mac.spread; const st={fx:false,kbd:true,sm,t:performance.now(),stop:null,lx:x,ly:y,last:null}; glPointers.set(e.pointerId,st); st.last=kbdNote(sm,0.75,pn,false); st.timer=setTimeout(()=>{ if(glPointers.get(e.pointerId)===st&&!st.stop) st.stop=watchHold(kbdHold(sm,0.7,pn)); },190); return; }
@@ -589,10 +593,11 @@ function drawKbd(fx0,acc,fg,dim,line){ const w=fx0/14, bh=GH*0.58; for(let i=0;i
     for(let o=0;o<2;o++) for(const [sm0,wi] of BLACK){ const sm=o*12+sm0-12, cx=(o*7+wi+1)*w, a=lit.get('k'+sm)||0; gg.fillStyle=a>0?acc:'#000'; gg.fillRect(cx-w*0.32,0,w*0.64,bh); gg.strokeStyle=a>0?acc:line; gg.strokeRect(cx-w*0.32+0.5,0.5,w*0.64-1,bh-1); if(a>0){ lit.set('k'+sm,a-0.05); if(a<=0.05) lit.delete('k'+sm); } } }
 const FXC={st32:'#f06aa8',st16:'#8a7cff',dive:'#4f8cff',stop:'#ffb020',crk:'#ff5a5f'}; const ca2=(col,al)=>col+Math.round(al*255).toString(16).padStart(2,'0');
 function drawGlide(){ if(!GW) glResize(); if(!GW||$('#glide').hidden) return; gg.clearRect(0,0,GW,GH); const cw=cellW(), ch=cellH(), fx0=0, acc=instr.col, fg=css('--fg'), dim=css('--dim'), line=css('--line');
-  gg.save(); gg.translate(OX(),0); if(isKbd()) drawKbd(GWg(),acc,fg,dim,line); else for(let c=0;c<GC;c++) for(let r=0;r<GR;r++){ const x=c*cw, y=(GR-1-r)*ch; const k=c+':'+r; const a=lit.get(k)||0; gg.strokeStyle=line; gg.strokeRect(x+0.5,y+0.5,cw-1,ch-1); if(a>0){ gg.fillStyle=acc; gg.globalAlpha=a*0.5; gg.fillRect(x+1,y+1,cw-2,ch-2); gg.globalAlpha=1; lit.set(k,a-0.05); if(a<=0.05) lit.delete(k); }
+  const rr=(x,y,w,h,r)=>{ gg.beginPath(); gg.roundRect?gg.roundRect(x,y,w,h,r):gg.rect(x,y,w,h); };
+  gg.save(); gg.translate(OX(),0); rr(0,0,GWg(),GH,12); gg.fillStyle=css('--bg-2'); gg.fill(); rr(0,0,GWg(),GH,12); gg.clip(); if(isKbd()) drawKbd(GWg(),acc,fg,dim,line); else for(let c=0;c<GC;c++) for(let r=0;r<GR;r++){ const x=c*cw, y=(GR-1-r)*ch; const k=c+':'+r; const a=lit.get(k)||0; gg.strokeStyle=line; gg.strokeRect(x+0.5,y+0.5,cw-1,ch-1); if(a>0){ gg.fillStyle=acc; gg.globalAlpha=a*0.5; gg.fillRect(x+1,y+1,cw-2,ch-2); gg.globalAlpha=1; lit.set(k,a-0.05); if(a<=0.05) lit.delete(k); }
     let label='', strong=false; if(instr.kind==='p'){ const semi=cellSemi(c,r); label=KEYS[((key+semi)%12+12)%12]+(4+Math.floor((semi+key)/12)); strong=semi%12===0; } else if(instr.kind==='n'){ label=c===0?NROWS[r]:(r===1?(2+Math.round(c/(GC-1)*5))+'連':'·'.repeat(c)); strong=c===0; } else if(instr.kind==='d'){ label=c===0?DROWS[r]:(r===0?['','短','','','','808'][c]:r===4?['','開','開','シェ','シェ','シェ'][c]:r===5?['','リム','5度','5度','8va','8va'][c]:'·'.repeat(c)); strong=c===0; } else { label=c===0?['−8va','−5','0','0','+5','+8va'][r]:'粒'+(c+1); strong=c===0; }
     gg.fillStyle=strong?acc:dim; gg.font=(strong?'600 ':'')+'11px '+css('--mono'); gg.textAlign='center'; gg.textBaseline='middle'; gg.fillText(label,x+cw/2,y+ch/2); }
-  gg.restore(); gg.fillStyle='#0e0e14'; gg.fillRect(fx0,0,fxW(),GH);
+  gg.restore(); rr(fx0,0,fxW(),GH,12); gg.fillStyle='#121119'; gg.fill();
   if(stripFx){ const zh=GH/FXL.length; FXL.forEach(([k,nm,sub],i)=>{ const y=i*zh, on=!!fx[k], col=FXC[k]; const rx=fx0+4, ry=y+4, rw=fxW()-8, rh=zh-8; gg.save(); gg.shadowColor=col; gg.shadowBlur=on?22:12; gg.fillStyle=on?col:ca2(col,0.16); gg.beginPath(); gg.roundRect?gg.roundRect(rx,ry,rw,rh,7):gg.rect(rx,ry,rw,rh); gg.fill(); gg.restore(); gg.strokeStyle=ca2(col,on?0.9:0.45); gg.lineWidth=1; gg.beginPath(); gg.roundRect?gg.roundRect(rx+0.5,ry+0.5,rw-1,rh-1,7):gg.rect(rx+0.5,ry+0.5,rw-1,rh-1); gg.stroke(); gg.fillStyle=on?'#000':col; gg.font='600 10px '+css('--mono'); gg.textAlign='center'; gg.textBaseline='middle'; gg.fillText(nm,fx0+fxW()/2,y+zh/2-6); gg.fillStyle=on?'#3a2412':dim; gg.font='9px '+css('--mono'); gg.fillText(sub,fx0+fxW()/2,y+zh/2+7); }); }
   else { gg.fillStyle=dim; for(let y=12;y<GH;y+=12) for(let x=fx0+10;x<fxW()-6;x+=12){ gg.beginPath(); gg.arc(x,y,0.7,0,6.283); gg.fill(); }
   gg.strokeStyle=dim; gg.setLineDash([2,4]); gg.beginPath(); gg.moveTo(fx0,GH/2+0.5); gg.lineTo(fxW(),GH/2+0.5); gg.stroke(); gg.setLineDash([]);
