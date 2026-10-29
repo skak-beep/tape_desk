@@ -591,14 +591,14 @@ function drawGlide(){ if(!GW) glResize(); if(!GW||$('#glide').hidden) return; gg
 const fx={st32:false,st16:false,dive:false,stop:false,crk:false}; let crkTimer=null, gateTimer=null;
 const FXL=[['st32','Ratchet','1/32 刻み'],['st16','Stutter','1/16 刻み'],['dive','Dive','こもる'],['stop','Wobble','テープよれ'],['crk','接触不良','プツプツ']];
 // rhythmic gate on the live bus (sound keeps ringing underneath; the gate just chops it)
-function gateStep(){ if(!fx.st32&&!fx.st16||!M) return; const t=ac.currentTime, per=60/P.rate/(fx.st32?8:4), g=M.pre.gain; g.cancelScheduledValues(t); g.setValueAtTime(g.value,t); g.linearRampToValueAtTime(1,t+0.002); g.setValueAtTime(1,t+per*0.55); g.linearRampToValueAtTime(0.08,t+per*0.55+0.004); gateTimer=setTimeout(gateStep,per*1000-3); }
-function crkStep(){ if(!fx.crk||!M){ return; } const t=ac.currentTime, g=M.pre.gain; g.cancelScheduledValues(t); const cur=g.value;
+function gateStep(){ if(!fx.st32&&!fx.st16||!M) return; const t=ac.currentTime, per=60/P.rate/(fx.st32?8:4), g=M.pre.gain; g.cancelScheduledValues(t); g.setValueAtTime(g.value,t); g.linearRampToValueAtTime(1,t+0.003); g.setValueAtTime(1,t+per*0.55); g.linearRampToValueAtTime(0.08,t+per*0.55+0.005); gateTimer=setTimeout(gateStep,per*1000-3); }
+function crkStep(){ if(!fx.crk||!M){ return; } const t=ac.currentTime, g=M.pre.gain; g.cancelScheduledValues(t); const cur=g.value; const R=0.003;   // 3 ms slopes: a dropout, not a click
   // a loose plug: mostly on, with short cut-outs, bursts of fast chatter, and the odd long dropout
   const r=Math.random(); let next;
-  if(r<0.45){ const on=0.004+Math.random()*0.06; g.setValueAtTime(cur,t); g.linearRampToValueAtTime(1,t+0.0005); next=on; }
-  else if(r<0.8){ const off=0.003+Math.random()*0.04; g.setValueAtTime(cur,t); g.linearRampToValueAtTime(0,t+0.0004); next=off; }
-  else if(r<0.95){ let tt=t; const n=3+Math.floor(Math.random()*8), iv=0.003+Math.random()*0.006; for(let k=0;k<n;k++){ g.setValueAtTime(k%2?0:1,tt); tt+=iv; } g.setValueAtTime(1,tt); next=tt-t; }   // chatter: ツツツツ
-  else { g.setValueAtTime(cur,t); g.linearRampToValueAtTime(0,t+0.0005); next=0.12+Math.random()*0.3; }   // long dropout
+  if(r<0.45){ const on=0.004+Math.random()*0.06; g.setValueAtTime(cur,t); g.linearRampToValueAtTime(1,t+R); next=on+R; }
+  else if(r<0.8){ const off=0.003+Math.random()*0.04; g.setValueAtTime(cur,t); g.linearRampToValueAtTime(0,t+R); next=off+R; }
+  else if(r<0.95){ let tt=t; g.setValueAtTime(cur,t); const n=3+Math.floor(Math.random()*8), iv=0.007+Math.random()*0.006; for(let k=0;k<n;k++){ g.linearRampToValueAtTime(k%2?0:1,tt+R); tt+=iv; g.setValueAtTime(k%2?0:1,tt); } g.linearRampToValueAtTime(1,tt+R); next=tt+R-t; }   // chatter: ツツツツ
+  else { g.setValueAtTime(cur,t); g.linearRampToValueAtTime(0,t+R); next=0.12+Math.random()*0.3; }   // long dropout
   crkTimer=setTimeout(crkStep,Math.max(3,next*1000-2)); }
 function fxOn(k){ ensureAudio(); const t=ac.currentTime; if(k==='crk'){ fx.crk=true; clearTimeout(crkTimer); crkStep(); return; } fx[k]=true; if(k==='st32'||k==='st16'){ clearTimeout(gateTimer); gateStep(); } if(k==='dive'){ M.lp.frequency.setTargetAtTime(420,t,0.18); M.clp.frequency.setTargetAtTime(420,t,0.18); M.lp.Q.setTargetAtTime(6,t,0.1); M.clp.Q.setTargetAtTime(6,t,0.1); } if(k==='stop'){ M.lfoG.gain.setTargetAtTime(0.012,t,0.3); M.wowLfo.frequency.setTargetAtTime(0.9,t,0.3); } }
 function fxOff(k){ if(!M) return; const t=ac.currentTime; fx[k]=false; if(k==='crk'){ clearTimeout(crkTimer); M.pre.gain.cancelScheduledValues(t); M.pre.gain.setValueAtTime(M.pre.gain.value,t); M.pre.gain.linearRampToValueAtTime(1,t+0.004); return; } if(k==='st32'||k==='st16'){ if(!fx.st32&&!fx.st16){ clearTimeout(gateTimer); M.pre.gain.cancelScheduledValues(t); M.pre.gain.setValueAtTime(M.pre.gain.value,t); M.pre.gain.linearRampToValueAtTime(1,t+0.01); } else { clearTimeout(gateTimer); gateStep(); } } if(k==='dive'){ M.lp.Q.setTargetAtTime(0.7,t,0.1); M.clp.Q.setTargetAtTime(0.5,t,0.1); applyKnobs(); } if(k==='stop'){ M.wowLfo.frequency.setTargetAtTime(0.45,t,0.3); applyKnobs(); } }
