@@ -14,9 +14,10 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--mono);font-
 .top .r{margin-left:auto;color:var(--dim);font-size:11px;white-space:nowrap} .top .r b{color:var(--fg);font-weight:500} .top .r b.rec{color:var(--rec)}
 #stack{width:100%;height:70px;display:block;border:1px solid var(--line)}
 button:disabled{opacity:0.35}
-.recbar{display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:5;background:var(--bg);padding:4px 0} .recbar .rl,#grain-src .rl{display:flex;gap:3px} #grain-src .rl button{min-height:36px;padding:8px 9px;font-size:11px} .recbar .rl button{min-height:36px;padding:8px 9px;font-size:11px} .recbar #b-rec-top{min-height:40px;padding:8px 14px} .recbar #m-tl{min-height:36px;padding:8px 9px;font-size:11px} .recbar .lbl{margin-left:auto;font-size:11px;color:var(--fg);white-space:nowrap;text-align:right} .recbar .lbl.rec{color:var(--rec)} .recbar .lbl.cnt{color:var(--acc);font-size:16px;font-weight:600}
+.recbar{display:flex;align-items:center;gap:6px;padding:4px 0} .recbar .rl,#grain-src .rl{display:flex;gap:3px} #grain-src .rl button{min-height:36px;padding:8px 9px;font-size:11px} .recbar .rl button{min-height:36px;padding:8px 9px;font-size:11px} .recbar #b-rec-top{min-height:40px;padding:8px 14px} .recbar #m-tl{min-height:36px;padding:8px 9px;font-size:11px} .recbar .lbl{margin-left:auto;font-size:11px;color:var(--fg);white-space:nowrap;text-align:right} .recbar .lbl.rec{color:var(--rec)} .recbar .lbl.cnt{color:var(--acc);font-size:16px;font-weight:600}
 #glide.rec{border-color:var(--rec);box-shadow:0 0 0 1px var(--rec) inset}
-.pane{display:none;flex-direction:column;gap:10px}.pane.on{display:flex}
+.pane{display:flex;flex-direction:column;gap:10px} .pane[hidden]{display:none!important}
+.transport{display:flex;gap:6px;align-items:center;position:sticky;top:0;z-index:6;background:var(--bg);padding:6px 0;border-bottom:1px solid var(--line)} .transport button{white-space:nowrap;padding:8px 10px;min-height:38px;font-size:12px;letter-spacing:.04em} .transport #tp-pos{color:var(--fg);font-size:12px;min-width:3.6em;text-align:center}
 .sets{display:flex;gap:5px} .sets button{flex:1;padding:10px 2px;min-height:40px;font-size:12px}
 /* grid: 8 rows, each = name | rate | 16 steps */
 .grid{display:flex;flex-direction:column;gap:3px}
@@ -81,17 +82,39 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
 
 <div id="app">
   <div class="top"><span class="t">構成</span>
-    <div class="tabs"><span class="on" data-tab="make">作る</span><span data-tab="tl">並べる</span><span data-tab="out">出力</span></div>
     <span class="r"><b id="r-audio">·</b> <b id="r-pos">00.0</b>s · <b id="r-n">0</b> clips</span></div>
+  <div class="transport">
+    <button id="t-play" class="primary">▶ Play</button><button id="t-loop">Loop</button><button id="t-head0">|◀</button>
+    <span class="lbl" id="tp-pos">00.0s</span>
+    <button id="t-fold" style="margin-left:auto">並べる ▾</button>
+  </div>
   <canvas id="stack"></canvas>
-
-  <section class="pane on" data-pane="make">
-    <div id="recband" hidden></div>
-    <div class="recbar">
-      <button id="b-rec-top" class="recbtn">● Rec</button>
-      <span class="rl"><button data-rl="4">4</button><button data-rl="8" class="on">8</button><button data-rl="15">15</button><button data-rl="30">30</button><button data-rl="0">∞</button></span>
-      <button id="m-tl">▶ 並べた音</button><span id="rec-status" class="lbl">READY</span>
+  <section id="tl-sec" class="pane" hidden>
+    <canvas id="tl"></canvas>
+    <div class="lbl" style="text-transform:none;margin:2px 0">上の帯=ワークエリア(ドラッグで範囲、タップで全体)・ 目盛り=再生位置をドラッグ ・ 2本指でズーム / 1本指でスクロール</div>
+    <div class="tlbar">
+      <button id="t-undo">↶ 戻す</button><button id="t-redo">↷ やり直す</button>
+      <select id="t-snap" aria-label="snap"><option value="0">Snap off</option><option value="0.5" selected>Snap 0.5s</option><option value="1">Snap 1s</option><option value="2">Snap 2s</option></select>
+      <select id="t-len" aria-label="length"><option value="30">30s</option><option value="60" selected>60s</option><option value="90">90s</option><option value="120">120s</option></select>
     </div>
+    <div id="clipbar" class="clipbar" hidden>
+      <div class="hd"><span id="cb-name">—</span><span><button id="cb-rev">逆再生</button><button id="cb-dup">複製</button><button id="cb-mute">Mute</button><button id="cb-del">削除</button><button id="cb-close">Close</button></span></div>
+      <div class="row">
+        <label class="kn"><span>Gain</span><input id="cb-gain" type="range" min="0" max="1.5" step="0.01" value="1"></label>
+        <label class="kn"><span>Fade in</span><input id="cb-fi" type="range" min="0" max="4" step="0.05" value="0.02"></label>
+        <label class="kn"><span>Fade out</span><input id="cb-fo" type="range" min="0" max="4" step="0.05" value="0.05"></label>
+        <label class="kn"><span>Repeat</span><input id="cb-rep" type="range" min="1" max="8" step="1" value="1"></label>
+      </div>
+      <div class="lbl" style="text-transform:none">ドラッグで移動(上下でレーン)、端をつまんで長さ。Fade out 0 = ブツ切り。</div>
+    </div>
+    <div class="lbl" style="text-transform:none">空いている所をタップ=再生位置。「作る」で録ったフレーズは、再生位置の空いているレーンに置かれます。</div>
+    <div class="row" id="sink-row" hidden><span class="lbl">出力先</span><select id="x-sink" aria-label="output device" style="flex:1"></select></div>
+    <div class="row"><span class="lbl">Mixdown</span><button id="x-mix" class="primary">Save audio</button><button id="x-json">AE markers (JSON)</button><span id="x-status" class="lbl" style="margin-left:auto"></span></div>
+    <div class="row"><span class="lbl">Key</span><button id="b-key">C minor</button><label class="kn"><span>Swing</span><input id="k-swing" type="range" min="0" max="1" step="0.01" value="0.3"></label></div>
+  </section>
+
+  <section class="pane on" id="make-sec">
+    <div id="recband" hidden></div>
     <div class="sets" id="mode"><button data-mode="glide" class="on">なぞる</button><button data-mode="step">ステップ</button></div>
     <div class="chips" id="instr"></div>
     <div class="lbl" style="text-transform:none;margin:4px 0 2px">音源をダブルタップ = その音源全体の音色</div>
@@ -121,6 +144,11 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
         <label class="kn"><span>Octave</span><input data-mac="oct" type="range" min="-2" max="2" step="1"></label>
         <label class="kn"><span>Spread</span><input data-mac="spread" type="range" min="0" max="1" step="0.01"></label>
       </div>
+    </div>
+    <div class="recbar">
+      <button id="b-rec-top" class="recbtn">● Rec</button>
+      <span class="rl"><button data-rl="4">4</button><button data-rl="8" class="on">8</button><button data-rl="15">15</button><button data-rl="30">30</button><button data-rl="0">∞</button></span>
+      <button id="b-micclip">● Mic</button><span id="rec-status" class="lbl">READY</span>
     </div>
     <canvas id="glide" hidden></canvas>
     <div id="glide-row" hidden>
@@ -157,39 +185,11 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
       <div class="knob" data-k="rate" data-min="40" data-max="200" data-v="120"><div class="k">120</div>BPM</div>
       <div class="knob" data-k="vol" data-min="0" data-max="100" data-v="85"><div class="k">85</div>Vol</div>
     </div>
-    <div class="row"><button id="b-rec" class="big recbtn">● Rec phrase</button><button id="b-micclip">● Mic phrase</button><button id="b-auto">降らす</button></div>
+    <div class="row"><button id="b-auto">降らす</button><span class="lbl" style="margin-left:auto;text-transform:none">降らす = 今の音源を自動でランダム再生</span></div>
   </section>
 
   
-  <section class="pane" data-pane="tl">
-    <canvas id="tl"></canvas>
-    <div class="lbl" style="text-transform:none;margin:2px 0">上の帯=ワークエリア(ドラッグで範囲、タップで全体)・ 目盛り=再生位置をドラッグ ・ 2本指でズーム / 1本指でスクロール</div>
-    <div class="tlbar">
-      <button id="t-play" class="primary">▶ Play</button><button id="t-loop">Loop</button><button id="t-head0">|◀</button>
-      <button id="t-undo">↶ 戻す</button><button id="t-redo">↷ やり直す</button>
-      <select id="t-snap" aria-label="snap"><option value="0">Snap off</option><option value="0.5" selected>Snap 0.5s</option><option value="1">Snap 1s</option><option value="2">Snap 2s</option></select>
-      <select id="t-len" aria-label="length"><option value="30">30s</option><option value="60" selected>60s</option><option value="90">90s</option><option value="120">120s</option></select>
-    </div>
-    <div id="clipbar" class="clipbar" hidden>
-      <div class="hd"><span id="cb-name">—</span><span><button id="cb-rev">逆再生</button><button id="cb-dup">複製</button><button id="cb-mute">Mute</button><button id="cb-del">削除</button><button id="cb-close">Close</button></span></div>
-      <div class="row">
-        <label class="kn"><span>Gain</span><input id="cb-gain" type="range" min="0" max="1.5" step="0.01" value="1"></label>
-        <label class="kn"><span>Fade in</span><input id="cb-fi" type="range" min="0" max="4" step="0.05" value="0.02"></label>
-        <label class="kn"><span>Fade out</span><input id="cb-fo" type="range" min="0" max="4" step="0.05" value="0.05"></label>
-        <label class="kn"><span>Repeat</span><input id="cb-rep" type="range" min="1" max="8" step="1" value="1"></label>
-      </div>
-      <div class="lbl" style="text-transform:none">ドラッグで移動(上下でレーン)、端をつまんで長さ。Fade out 0 = ブツ切り。</div>
-    </div>
-    <div class="lbl" style="text-transform:none">空いている所をタップ=再生位置。「作る」で録ったフレーズは、再生位置の空いているレーンに置かれます。</div>
-  </section>
 
-  <section class="pane" data-pane="out">
-    <div class="row" id="sink-row" hidden><span class="lbl">出力先</span><select id="x-sink" aria-label="output device" style="flex:1"></select></div>
-    <div class="row"><span class="lbl">Mixdown</span><button id="x-mix" class="primary">Save audio</button><button id="x-json">AE markers (JSON)</button><span id="x-status" class="lbl" style="margin-left:auto"></span></div>
-    <div class="row"><span class="lbl">Preset</span><button data-pre="video" class="on">動画</button><button data-pre="fog">霧</button><button data-pre="glass">硝子</button></div>
-    <div class="row"><span class="lbl">Key</span><button id="b-key">C minor</button><label class="kn"><span>Swing</span><input id="k-swing" type="range" min="0" max="1" step="0.01" value="0.3"></label></div>
-    <div class="lbl" style="text-transform:none">Mixdown はタイムライン全体を正確に書き出します。AE markers は各クリップの開始/終了秒を JSON で出します(After Effects のマーカーや式に使えます)。</div>
-  </section>
   <div class="foot"><span>MAKE <b>PHRASE</b> · ARRANGE <b>CLIPS</b></span><span id="dsp">DSP 00%</span></div>
 </div>
 <div id="toast"></div>
@@ -224,7 +224,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden){ wentHidd
 function onRoute(){ if(!ac) return; lastCT=-1; stuck=0; try{ ac.resume(); }catch(e){} setTimeout(()=>{ if(!ac||document.hidden) return; if(ac.state!=='running'&&!needRebuild) askWake('音の出口が切り替わりました'); },700); if(typeof fillSinks==='function') fillSinks(); }
 if(navigator.mediaDevices&&navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange',onRoute);
 let toastT; const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600);};
-document.querySelectorAll('.tabs span').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tabs span').forEach(x=>x.classList.toggle('on',x===t));document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===t.dataset.tab));});
+let tlOpen=false; const tlSec=$('#tl-sec'); function setTlOpen(o){ tlOpen=o; tlSec.hidden=!o; $('#stack').hidden=o; $('#t-fold').textContent=o?'並べる ▴':'並べる ▾'; $('#t-fold').classList.toggle('on',o); if(o) requestAnimationFrame(()=>{ if(typeof tlResize==='function') tlResize(); }); } $('#t-fold').onclick=()=>setTlOpen(!tlOpen); $('#stack').onclick=()=>setTlOpen(true);
 const KEYS=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; let key=0; const hz=m=>440*Math.pow(2,(m-69)/12), root=()=>48+key;
 const P={dark:50,rev:60,tape:50,decay:100,rate:120,vol:85}; const dec=()=>P.decay/100;
 let loopLen=30, loopStart=0, playing=false, layers=[], sample=null, sampleRev=null, curSet='drums', autoOn=false;
@@ -640,7 +640,7 @@ $('#b-mic').onclick=async()=>{ const b=$('#b-mic'), nm=$('#smp-name'); if(micJob
   await new Promise(r=>{ micCancel=countIn(()=>{ micCancel=null; r(); },'粒の録音まで'); }); if(!b.classList.contains('on')){ st.getTracks().forEach(x=>x.stop()); return; }
   nm.className='lbl rec'; nm.textContent='● 0.0s'; const buf=await micCapture(grainLen,sec=>{ if(sec>=0){ nm.textContent='● '+sec.toFixed(1)+'s / '+grainLen+'s'; bandShow('● REC '+sec.toFixed(1)+'s / '+grainLen+'s<small>粒の素材をマイクで録音中 — Stop で終了</small>'); } else bandHide(); },st); b.classList.remove('on'); b.textContent='● Rec'; nm.className='lbl'; bandHide();
   if(buf){ setSample(buf,'mic '+buf.duration.toFixed(1)+'s'); toast('粒の素材に入れました('+buf.duration.toFixed(1)+'秒)'); } else nm.textContent=sample?nm.dataset.prev||'入っています':'まだ無し'; };
-$('#b-micclip').onclick=async()=>{ const b=$('#b-micclip'); if(micJob){ micJob.stop(); return; } if(micCancel){ micCancel(); micCancel=null; b.classList.remove('on'); b.textContent='● Mic phrase'; return; } b.classList.add('on'); b.textContent='■ Stop mic'; const ms=await micOpen(); if(!ms){ b.classList.remove('on'); b.textContent='● Mic phrase'; return; } await new Promise(r=>{ micCancel=countIn(()=>{ micCancel=null; r(); },'マイク録音まで'); }); if(!b.classList.contains('on')){ ms.getTracks().forEach(x=>x.stop()); return; } const st=$('#rec-status'); const buf=await micCapture(recLen||120,sec=>{ if(sec>=0){ st.textContent='● MIC '+sec.toFixed(1)+'s'; st.className='lbl rec'; bandShow('● MIC '+sec.toFixed(1)+'s'+(recLen?' / '+recLen+'s':'')+'<small>マイクをクリップに録音中 — もう一度押すと停止</small>'); } else { st.className='lbl'; bandHide(); } },ms); b.classList.remove('on'); b.textContent='● Mic phrase'; if(buf) addClip(buf,'マイク'); };
+$('#b-micclip').onclick=async()=>{ const b=$('#b-micclip'); if(micJob){ micJob.stop(); return; } if(micCancel){ micCancel(); micCancel=null; b.classList.remove('on'); b.textContent='● Mic'; return; } b.classList.add('on'); b.textContent='■ Stop'; const ms=await micOpen(); if(!ms){ b.classList.remove('on'); b.textContent='● Mic'; return; } await new Promise(r=>{ micCancel=countIn(()=>{ micCancel=null; r(); },'マイク録音まで'); }); if(!b.classList.contains('on')){ ms.getTracks().forEach(x=>x.stop()); return; } const st=$('#rec-status'); const buf=await micCapture(recLen||120,sec=>{ if(sec>=0){ st.textContent='● MIC '+sec.toFixed(1)+'s'; st.className='lbl rec'; bandShow('● MIC '+sec.toFixed(1)+'s'+(recLen?' / '+recLen+'s':'')+'<small>マイクをクリップに録音中 — もう一度押すと停止</small>'); } else { st.className='lbl'; bandHide(); } },ms); b.classList.remove('on'); b.textContent='● Mic'; if(buf) addClip(buf,'マイク'); };
 
 /* knobs */
 function showKnobs(){ document.querySelectorAll('.knob').forEach(el=>{ const k=el.dataset.k, mn=+el.dataset.min, mx=+el.dataset.max; el.querySelector('.k').textContent=P[k]; el.style.setProperty('--rot',(-135+270*(P[k]-mn)/(mx-mn))+'deg'); }); }
@@ -655,11 +655,11 @@ let countTimer=null, counting=false;
 const band=$('#recband'); function bandShow(html,cnt){ band.innerHTML=html; band.className=cnt?'cnt':''; band.hidden=false; document.body.classList.toggle('rec',!cnt); } function bandHide(){ band.hidden=true; document.body.classList.remove('rec'); }
 // 3-2-1 count-in with clicks, then cb(). Press again (cancel()) to abort.
 function countIn(cb,label){ ensureAudio(); counting=true; let n=3; const tick=()=>{ if(!counting) return; if(n>0){ bandShow(String(n)+'<small>'+(label||'録音まで')+'</small>',true); noise({hp:2500,len:0.01,gain:0.3,pan:0},PP()); n--; countTimer=setTimeout(tick,600); } else { counting=false; bandHide(); cb(); } }; tick(); return ()=>{ counting=false; clearTimeout(countTimer); bandHide(); }; }
-function setRecUI(on){ if(!on) bandHide(); for(const id of ['#b-rec','#b-rec-top']){ const b=$(id); b.classList.toggle('on',on); } $('#b-rec').textContent=on?'■ Stop':'● Rec phrase'; $('#b-rec-top').textContent=on?'■ Stop':'● Rec'; $('#glide').classList.toggle('rec',on); }
+function setRecUI(on){ if(!on) bandHide(); const b=$('#b-rec-top'); b.classList.toggle('on',on); b.textContent=on?'■ Stop':'● Rec'; $('#glide').classList.toggle('rec',on); }
 function recWithCount(){ ensureAudio(); if(recording){ rec(false); return; } if(counting){ clearTimeout(countTimer); counting=false; bandHide(); return; }
   countIn(()=>rec(true),'フレーズ録音まで'); }
 $('#b-rec-top').onclick=recWithCount;
-$('#m-tl').onclick=()=>{ ensureAudio(); if(tlPlaying){ tlPlay(false); return; } if(!clips.length){ toast('並べる にクリップがありません'); return; } if(!tlLoop){ tlLoop=true; $('#t-loop').classList.add('on'); } head=wa.s; tlPlay(true); };
+
 let recName=null, recWithTL=false;
 function rec(on,opt){ ensureAudio(); if(on===recording) return; if(on&&typeof slAutoSet==='function'&&slAuto) slAutoSet(false); recording=on; setRecUI(on); opt=opt||{};
   if(on){ const len=opt.len||recLen; recMax=Math.floor((len||120)*ac.sampleRate); recL=new Float32Array(recMax); recR=new Float32Array(recMax); recIdx=0; recStart=opt.start||ac.currentTime+0.05; recName=opt.name||null; capOn(true); recWithTL=tlPlaying; if(recWithTL){ tlPlay(false); head=wa.s; tlPlay(true,recStart); } if(opt.len) return; toast(recLen?recLen+'秒 録音中':'録音中(■で止める)'); return; }
@@ -667,7 +667,7 @@ function rec(on,opt){ ensureAudio(); if(on===recording) return; if(on&&typeof sl
   if(recL){ const n=Math.max(1,recIdx); let peak=0; for(let i=0;i<n;i+=53) peak=Math.max(peak,Math.abs(recL[i]),Math.abs(recR[i])); if(peak<0.003||n<ac.sampleRate*0.2){ toast('何も鳴らなかったので、フレーズは作りませんでした'); recL=recR=null; return; }
     const buf=ac.createBuffer(2,n,ac.sampleRate); buf.copyToChannel(recL.subarray(0,n),0); buf.copyToChannel(recR.subarray(0,n),1); recL=recR=null; addClip(buf,recName||(mode==='glide'?instr.name:'ステップ')); recName=null; } }
 function capOn(on){ if(!ac) return; if(capNode){ capNode.port.postMessage({on}); return; } if(on){ if(!proc){ proc=ac.createScriptProcessor(2048,2,1); proc.onaudioprocess=onCapture; } M.pre.connect(proc); proc.connect(capSink); } else if(proc){ try{ M.pre.disconnect(proc); proc.disconnect(); }catch(e){} } }
-$('#b-rec').onclick=recWithCount;
+
 
 /* ---------- timeline model ---------- */
 const COLORS={'綺麗':'#e0a92a','澄':'#f2e6c8','なぞる':'#ffd27a','ノイズ':'#dcd7cb','低音':'#5aa0b0','粒':'#e5668f','軌道':'#4fae68','マイク':'#ff7a1a'};
@@ -703,7 +703,7 @@ function tlResize(){ const r=tl.getBoundingClientRect(); if(!r.width) return; co
 const LH=34; let lanes=Array.from({length:6},()=>({mute:false,solo:false})); const laneOn=l=>!lanes[l].mute&&(!lanes.some(x=>x.solo)||lanes[l].solo);
 const pxPerSec=()=>(TW-LH)/tlLen*zoom, xOf=t=>LH+(t*pxPerSec())-scrollX, tOf=x=>(x-LH+scrollX)/pxPerSec();
 const pk2=new WeakMap(); function peaksOf(buf,n){ let p=pk2.get(buf); if(p&&p.length===n) return p; const d=buf.getChannelData(0), per=Math.max(1,Math.floor(d.length/n)); p=new Float32Array(n); for(let i=0;i<n;i++){ let m=0; for(let j=i*per;j<Math.min(d.length,(i+1)*per);j+=8) m=Math.max(m,Math.abs(d[j])); p[i]=m; } pk2.set(buf,p); return p; }
-function drawTL(){ if(!document.querySelector('.pane[data-pane="tl"]').classList.contains('on')) return; if(!TW) tlResize(); tg.clearRect(0,0,TW,TH); const line=css('--line'), dim=css('--dim'), fg=css('--fg'), acc=css('--acc');
+function drawTL(){ if(tlSec.hidden) return; if(!TW) tlResize(); tg.clearRect(0,0,TW,TH); const line=css('--line'), dim=css('--dim'), fg=css('--fg'), acc=css('--acc');
   // lanes
   for(let l=0;l<LANES;l++){ const y=RULER+l*LANE_H; tg.fillStyle=l%2?'#0e0e0f':'#0a0a0b'; tg.fillRect(0,y,TW,LANE_H); tg.strokeStyle=line; tg.beginPath(); tg.moveTo(0,y+0.5); tg.lineTo(TW,y+0.5); tg.stroke(); }
   tg.save(); tg.beginPath(); tg.rect(LH,0,TW-LH,TH); tg.clip();
@@ -727,7 +727,7 @@ function drawTL(){ if(!document.querySelector('.pane[data-pane="tl"]').classList
   const hx=xOf(tlPos()); tg.fillStyle=fg; tg.fillRect(hx-0.5,0,1.5,TH); tg.fillStyle=acc; tg.beginPath(); tg.moveTo(hx-6,WAH); tg.lineTo(hx+6,WAH); tg.lineTo(hx,WAH+9); tg.fill();
   $('#r-pos').textContent=tlPos().toFixed(1).padStart(4,'0'); }
 function tlTick(){ if(!tlPlaying) return; const p=tlPos(); if(p>=wa.e){ if(tlLoop&&!recording){ tlPlay(false); head=wa.s; tlPlay(true); } else { tlPlay(false); head=wa.s; } } $('#r-pos').textContent=tlPos().toFixed(1).padStart(4,'0'); syncTLButtons(); }
-function syncTLButtons(){ const b=$('#m-tl'); if(b){ b.classList.toggle('on',tlPlaying); b.textContent=tlPlaying?'■ 並べた音':'▶ 並べた音'; } }
+function syncTLButtons(){ $('#tp-pos').textContent=tlPos().toFixed(1).padStart(4,'0')+'s'; }
 setInterval(()=>{ const st=$('#rec-status'); if(counting||micJob||micCancel) return; if(recording&&ac){ const el=Math.max(0,ac.currentTime-recStart); st.textContent='● '+el.toFixed(1)+(recLen?'/'+recLen:'')+'s'; st.className='lbl rec'; bandShow('● REC '+el.toFixed(1)+'s'+(recLen?' / '+recLen+'s':'')+'<small>'+(recName||'フレーズを録音中 — もう一度押すと停止')+'</small>'); } else { st.textContent=recLen?recLen+'s':'∞'; st.className='lbl'; } },100);
 // pointer interaction: tap = head / select; drag clip = move; drag edge = trim
 let drag=null;
