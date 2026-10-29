@@ -129,7 +129,7 @@ input[type=range]{flex:1;min-width:60px;accent-color:var(--acc);height:28px;marg
       <div class="knob" data-k="tape" data-min="0" data-max="100" data-v="50"><div class="k">50</div>Tape</div>
       <div class="knob" data-k="decay" data-min="20" data-max="300" data-v="100"><div class="k">100</div>Decay</div>
       <div class="knob" data-k="rate" data-min="40" data-max="200" data-v="120"><div class="k">120</div>BPM</div>
-      <div class="knob" data-k="vol" data-min="0" data-max="100" data-v="70"><div class="k">70</div>Vol</div>
+      <div class="knob" data-k="vol" data-min="0" data-max="100" data-v="85"><div class="k">85</div>Vol</div>
     </div>
     <div class="row">
       <span class="lbl">長さ</span><button data-rl="4">4s</button><button data-rl="8" class="on">8s</button><button data-rl="15">15s</button><button data-rl="30">30s</button><button data-rl="0">∞</button>
@@ -197,7 +197,7 @@ document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&ac){ las
 let toastT; const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600);};
 document.querySelectorAll('.tabs span').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tabs span').forEach(x=>x.classList.toggle('on',x===t));document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===t.dataset.tab));});
 const KEYS=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; let key=0; const hz=m=>440*Math.pow(2,(m-69)/12), root=()=>48+key;
-const P={dark:50,rev:60,tape:50,decay:100,rate:120,vol:70}; const dec=()=>P.decay/100;
+const P={dark:50,rev:60,tape:50,decay:100,rate:120,vol:85}; const dec=()=>P.decay/100;
 let loopLen=30, loopStart=0, playing=false, layers=[], sample=null, sampleRev=null, curSet='glide', autoOn=false;
 const PP=()=>({pitch:0,tone:0.5,decay:1,cut:1,level:1,pan:0,rev:1,vel:0.7,reverse:false,clean:false,voice:'bell',glide:false});
 
@@ -210,8 +210,10 @@ function ensureAudio(){ if(ac){ if(ac.state!=='running') ac.resume(); return ac;
   const rev=ac.createConvolver(); rev.buffer=mkIR(3.2); const revIn=ac.createGain(), revG=ac.createGain(); const pre=ac.createGain();
   const mixB=ac.createGain(), glideSum=ac.createGain(), gdrive=ac.createWaveShaper(), glp=ac.createBiquadFilter(); glp.type='lowpass'; glp.frequency.value=6000; gdrive.curve=new Float32Array([-1,0,1]); gdrive.oversample='2x';
   padSum.connect(lp).connect(wow).connect(sat).connect(mixB); cleanSum.connect(clp).connect(mixB); glideSum.connect(gdrive).connect(glp).connect(cleanSum); mixB.connect(stIn).connect(stD); stD.connect(stFb).connect(stD); stD.connect(pre); revIn.connect(rev); rev.connect(revG).connect(clp);
-  const layBus=ac.createGain(), master=ac.createGain(), comp=ac.createDynamicsCompressor(); comp.threshold.value=-14; comp.ratio.value=3; comp.knee.value=10; const out=ac.createGain(); const tap=ac.createMediaStreamDestination();
-  pre.connect(master); layBus.connect(master); master.connect(comp).connect(out); out.connect(ac.destination); out.connect(tap);
+  const layBus=ac.createGain(), master=ac.createGain(), comp=ac.createDynamicsCompressor(); comp.threshold.value=-10; comp.ratio.value=2.5; comp.knee.value=12; comp.attack.value=0.01; comp.release.value=0.25;
+  const lim=ac.createDynamicsCompressor(); lim.threshold.value=-1.5; lim.knee.value=0; lim.ratio.value=20; lim.attack.value=0.001; lim.release.value=0.12;   // brick-wall: nothing reaches the DAC above 0 dB
+  const out=ac.createGain(); const tap=ac.createMediaStreamDestination();
+  pre.connect(master); layBus.connect(master); master.connect(comp).connect(lim).connect(out); out.connect(ac.destination); out.connect(tap);
   // capture for phrase recording: AudioWorklet (audio thread) when available, else a ScriptProcessor that is connected only while recording
   capSink=ac.createGain(); capSink.gain.value=0; capSink.connect(ac.destination); capNode=null; proc=null;
   if(ac.audioWorklet){ try{ const src="class Cap extends AudioWorkletProcessor{constructor(){super();this.on=false;this.port.onmessage=e=>{this.on=!!e.data.on};}process(i){const a=i[0];if(this.on&&a&&a[0]){this.port.postMessage({t:currentTime,L:Float32Array.from(a[0]),R:Float32Array.from(a[1]||a[0])});}return true;}}registerProcessor('cap',Cap);";
@@ -221,7 +223,7 @@ function mkNoise(sec){ const n=Math.floor(ac.sampleRate*sec), b=ac.createBuffer(
 function mkIR(sec){ const n=Math.floor(ac.sampleRate*sec), b=ac.createBuffer(1,n,ac.sampleRate); for(let c=0;c<1;c++){const d=b.getChannelData(c);let l=0;for(let i=0;i<n;i++){const w=Math.random()*2-1;l=0.82*l+0.18*w;d[i]=l*Math.pow(1-i/n,3.4)*1.4;}} return b; }
 function satCurve(a){ const n=1024,c=new Float32Array(n),k=a*20+1; for(let i=0;i<n;i++){const x=i*2/n-1;c[i]=(1+k)*x/(1+k*Math.abs(x));} return c; }
 function applyKnobs(){ if(!M) return; const t=ac.currentTime; const d=P.dark/100; if(!fx.dive&&!fx.stop){ M.lp.frequency.setTargetAtTime(16000*Math.pow(0.08,d),t,0.1); M.clp.frequency.setTargetAtTime(20000*Math.pow(0.12,d),t,0.1); }
-  M.revG.gain.setTargetAtTime(Math.pow(P.rev/100,1.2)*1.4,t,0.1); M.sat.curve=satCurve(0.05+P.tape/100*0.5); M.lfoG.gain.setTargetAtTime(P.tape/100*0.0016,t,0.1); M.out.gain.setTargetAtTime(P.vol/100*1.1,t,0.05); }
+  M.revG.gain.setTargetAtTime(Math.pow(P.rev/100,1.2)*1.4,t,0.1); M.sat.curve=satCurve(0.05+P.tape/100*0.5); M.lfoG.gain.setTargetAtTime(P.tape/100*0.0016,t,0.1); M.out.gain.setTargetAtTime(P.vol/100*0.95,t,0.05); }
 /* every voice ends in gate(): pan + per-pad reverse envelope + abrupt cut */
 function gate(t,dur,pp,pn){ const g=ac.createGain(), p=ac.createStereoPanner?ac.createStereoPanner():ac.createGain(); if(p.pan) p.pan.value=Math.max(-1,Math.min(1,pn+pp.pan)); g.connect(p).connect(pp.glide?M.glideSum:pp.clean?M.cleanSum:M.padSum);
   if(pp.reverse){ const end=t+Math.max(0.08,dur*0.85); g.gain.setValueAtTime(0.03,t); g.gain.exponentialRampToValueAtTime(1.7,end); g.gain.setValueAtTime(0,end+0.004); } else g.gain.setValueAtTime(1,t);
@@ -248,7 +250,7 @@ function tone(semi,v,pn,pp,at){ pp=pp||PP(); const t=at||ac.currentTime, f=hz(ro
     organ:  {p:[[1,1,0,0],[2,0.6,0,0],[3,0.4,0,0],[4,0.3,0,0],[6,0.1,0,0]],att:0.03,dur:1.1+v*0.8,lp:3000,wob:0.15,trem:true},
     sub:    {p:[[0.5,1,0,0],[1,0.3,0,0],[2,0.05,0,0.3]],att:0.012,dur:1.2+v*0.8},
     vpiano: {p:[[1,1,0,0],[2,0.12+v*0.1,0,0.12],[3,0.05,0,0.06],[4,0.02,0,0.04],[5.1,0.012,0,0.03]],att:0.004,dur:Math.max(0.3,Math.min(4.2,4.6-((semi+pp.pitch+12)*0.11)))*(0.45+v*0.7),trem:true,tremRate:5.5+Math.random()*1.5,tremDepth:0.15,hammer:true} }[kind]||null;
-  const spec=V||{p:[[1,1,0,0]],att:0.01,dur:2}; const dur=spec.dur*dec()*pp.decay, att=Math.min(dur*0.8,spec.att*(pp.attMul||1)), out=gate(t,dur,pp,pn), g=ac.createGain(); const lvl=(kind==='pad'||kind==='breath'||kind==='choir'?0.22:kind==='revgtr'?0.16:kind==='vpiano'?0.34:0.3)*(kind==='vpiano'?0.25+v*0.75:0.4+v*0.6)*pp.level;
+  const spec=V||{p:[[1,1,0,0]],att:0.01,dur:2}; const dur=spec.dur*dec()*pp.decay, att=Math.min(dur*0.8,spec.att*(pp.attMul||1)), out=gate(t,dur,pp,pn), g=ac.createGain(); const lvl=(kind==='pad'||kind==='breath'||kind==='choir'?0.22:kind==='revgtr'?0.16:kind==='vpiano'?0.28:0.26)*(kind==='vpiano'?0.25+v*0.75:0.4+v*0.6)*pp.level;
   if(spec.rev){ g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(lvl,t+dur*0.9); g.gain.setValueAtTime(0,t+dur*0.9+0.004); }   // tape played backwards: swells up, then cuts
   else { g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(lvl,t+att); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); }
   const wobAmt=(pp.wob!==undefined?pp.wob:(spec.wob||0)); let wobG=null; if(wobAmt>0){ const lfo=ac.createOscillator(); lfo.frequency.value=spec.wob?0.6+Math.random()*0.8:4.5+Math.random(); wobG=ac.createGain(); wobG.gain.value=wobAmt*(spec.wob?40:12); lfo.connect(wobG); lfo.start(t); lfo.stop(t+dur+0.2); if(spec.wob){ const fl=ac.createOscillator(); fl.frequency.value=7+Math.random()*3; const fg=ac.createGain(); fg.gain.value=wobAmt*6; fl.connect(fg).connect(wobG); fl.start(t); fl.stop(t+dur+0.2); } }
@@ -299,7 +301,7 @@ function sparkle(semi,v,pn,pp,hold){ pp=pp||PP(); let on=true; const base=root()
       const sp={...pp,voice:'vpiano',decay:0.6+Math.random()*0.5,level:pp.level*0.7,rev:pp.rev*1.3,clean:true,glide:true}; tone(m-root()-12,vv,pn+(Math.random()-0.5)*0.8,sp); if(Math.random()<0.18) setTimeout(()=>tone(m-root()-12+[7,12,5][Math.floor(Math.random()*3)],vv*0.8,pn,sp),4+Math.random()*10); return m; };
   if(!hold){ let n=3+Math.floor(Math.random()*6), c=base; let dt=0; for(let k=0;k<n;k++){ setTimeout(()=>{ c=one(c); },dt); dt+=40+Math.random()*130*(1.2-v); } return ()=>{}; }
   let c=base; const loop=()=>{ if(!on) return; c=one(c); if(Math.random()<0.2) c=base; setTimeout(loop,60+Math.random()*220); }; loop(); return ()=>{ on=false; }; }
-function pianoHold(semi,v,pn,pp){ pp=pp||PP(); const t=ac.currentTime, f=hz(root()+12+semi+pp.pitch), g=ac.createGain(), out=gate(t,60,{...pp,reverse:false,cut:1},pn), lvl=0.34*(0.25+v*0.75)*pp.level; g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(lvl*0.95,t+0.12); g.gain.exponentialRampToValueAtTime(lvl*0.45,t+3); g.gain.exponentialRampToValueAtTime(lvl*0.2,t+9);
+function pianoHold(semi,v,pn,pp){ pp=pp||PP(); const t=ac.currentTime, f=hz(root()+12+semi+pp.pitch), g=ac.createGain(), out=gate(t,60,{...pp,reverse:false,cut:1},pn), lvl=0.28*(0.25+v*0.75)*pp.level; g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(lvl*0.95,t+0.12); g.gain.exponentialRampToValueAtTime(lvl*0.45,t+3); g.gain.exponentialRampToValueAtTime(lvl*0.2,t+9);
   const tr=ac.createOscillator(); tr.frequency.value=5.5+Math.random()*1.5; const tg=ac.createGain(); tg.gain.value=0.15; const base=ac.createGain(); base.gain.value=0.85; tr.connect(tg).connect(base.gain); base.connect(g); tr.start(t); const oscs=[tr];
   for(const [mul,gn,dc] of [[1,1,0],[2,0.04,0]]){ const o=ac.createOscillator(); o.type='sine'; o.frequency.value=f*mul; o.detune.value=bend*100; const og=ac.createGain(); og.gain.setValueAtTime(gn,t); if(dc) og.gain.setTargetAtTime(gn*0.12,t+0.01,dc); o.connect(og).connect(base); o.start(t); oscs.push(o); const e={o,det:0}; bendable.add(e); o.onended=()=>bendable.delete(e); }
   g.connect(out); revSend(g,1.3*pp.rev); return ()=>{ const tt=ac.currentTime, rel=0.25+pp.decay*0.7; g.gain.cancelScheduledValues(tt); g.gain.setValueAtTime(g.gain.value,tt); g.gain.exponentialRampToValueAtTime(0.0001,tt+rel); oscs.forEach(o=>o.stop(tt+rel+0.1)); }; }
@@ -310,7 +312,7 @@ function revHold(semi,v,pn,pp){ pp=pp||PP(); const t=ac.currentTime, f=hz(root()
 function noise(o,pp,at){ pp=pp||PP(); const t=at||ac.currentTime, n=ac.createBufferSource(); n.buffer=noiseB; n.loop=true; const f=ac.createBiquadFilter(), fm=Math.pow(2,pp.pitch/12)*(0.5+pp.tone); if(o.bp){ f.type='bandpass'; f.frequency.value=o.bp*fm; f.Q.value=o.q||1; } else { f.type='highpass'; f.frequency.value=(o.hp||1000)*fm; }
   const len=o.len*(o.hold?1:dec()*pp.decay), g=ac.createGain(), lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=7500; const out=gate(t,o.hold?2:len,pp,o.pan); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(o.gain*1.6*pp.level,t+(o.fadeIn||0.002)); if(!o.hold) g.gain.exponentialRampToValueAtTime(0.0001,t+len);
   let last=g; if(o.am){ const l=ac.createOscillator(); l.type='square'; l.frequency.value=o.am; const lg=ac.createGain(); lg.gain.value=0.5; const off=ac.createGain(); off.gain.value=0.5; l.connect(lg).connect(off.gain); g.connect(off); last=off; l.start(t); l.stop(t+(o.hold?60:len+0.05)); }
-  n.connect(f).connect(lp).connect(g); last.connect(out); if(o.rev) revSend(g,o.rev*pp.rev); n.start(t,Math.random()*0.9); if(!o.hold) n.stop(t+len+0.05);
+  n.connect(f).connect(lp).connect(g); last.connect(out); if(o.rev) revSend(g,o.rev*pp.rev); n.start(t,Math.random()*0.9); n.stop(t+(o.hold?21:len+0.05));
   return ()=>{ const tt=ac.currentTime; g.gain.cancelScheduledValues(tt); g.gain.setTargetAtTime(0.0001,tt,0.08); n.stop(tt+0.6); }; }
 function thump(f0,v,pn,pp,at){ pp=pp||PP(); const t=at||ac.currentTime, o=ac.createOscillator(), g=ac.createGain(); f0*=Math.pow(2,pp.pitch/12); const dur=0.3*dec()*pp.decay+0.1; o.type='sine'; o.frequency.setValueAtTime(f0*(1.6+pp.tone*1.4),t); o.frequency.exponentialRampToValueAtTime(f0,t+0.09); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.9*v*pp.level,t+0.005); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); o.connect(g).connect(gate(t,dur,pp,pn*0.3)); o.start(t); o.stop(t+dur+0.3); }
 function bassPluck(semi,v,pn,pp,at){ pp=pp||PP(); const t=at||ac.currentTime, f=hz(root()-12+semi+pp.pitch), dur=0.6*dec()*pp.decay, o=ac.createOscillator(), s=ac.createOscillator(), g=ac.createGain(), lp=ac.createBiquadFilter(); o.type='sawtooth'; o.frequency.value=f; s.type='sine'; s.frequency.value=f; lp.type='lowpass'; lp.Q.value=3; lp.frequency.setValueAtTime(200+pp.tone*400+v*900,t); lp.frequency.exponentialRampToValueAtTime(120,t+dur*0.6);
@@ -440,7 +442,7 @@ const fxW=()=>Math.max(54,GW*0.2), cellW=()=>(GW-fxW())/GC, cellH=()=>GH/GR;
 function cellSemi(c,r){ const sc=SC[glScale], step=glScale==='penta'?2:3; const deg=c+step*r; return 12*Math.floor(deg/sc.length)+sc[deg%sc.length]-12; }  // from C3 up ~2.5 octaves
 const glPointers=new Map(); let glTone=0.5, glChord=false; const lit=new Map();
 function chordSemis(c,r){ const sm=cellSemi(c,r); if(!glChord) return [sm]; const sc=SC[glScale], step=glScale==='penta'?2:3, deg=c+step*r, L=sc.length; const at=d=>12*Math.floor(d/L)+sc[d%L]-12; return [sm,at(deg+2),at(deg+4)]; }   // diatonic triad on that degree
-const NROWS=['ツ','ツツツ','プツッ','ザッ','ザー','ピチー'];
+const NROWS=['ツ','ツツツ','プツッ','ザッ','白','乱'];
 function glNote(c,r,v,quick,drag){ const m=instr.mac, pn=(c-(GC-1)/2)/(GC-1)*1.4*m.spread; lit.set(c+':'+r,1); const u=c/(GC-1);
   if(instr.kind==='p'){ const pp=macPP(m); if(drag){ pp.decay*=0.4; pp.rev*=0.55; pp.level*=0.85; } if(glChord&&!['revgtr','robo','bed','sparkle'].includes(instr.voice)){ { const st=chordSemis(c,r).map((sm,k)=>tone(sm,v*(k?0.8:1),pn,pp)); return f=>st.forEach(x=>x&&x(f)); } } if(instr.voice==='revgtr'){ revChord(cellSemi(c,r),v,pn,pp,false); return; } if(instr.voice==='robo'){ robo(cellSemi(c,r),v,pn,pp,false); return; } if(instr.voice==='bed'){ bed(cellSemi(c,r),v,pn,pp,false); return; } if(instr.voice==='sparkle'){ sparkle(cellSemi(c,r),v,pn,pp,false); return; } return tone(cellSemi(c,r),v,pn,pp); }
   if(instr.kind==='g'){ if(!sample){ toast('出力タブ「粒の素材」で録音かファイルを入れてください'); return; } const pp=macPP(m,{pitch:[-12,-7,0,0,7,12][r]+m.oct*12,voice:undefined}); grain(Math.min(7,c),v,pn,pp); return; }
@@ -449,23 +451,27 @@ function glNote(c,r,v,quick,drag){ const m=instr.mac, pn=(c-(GC-1)/2)/(GC-1)*1.4
     case 1: { const n=2+Math.round(u*5), iv=0.028+(1-u)*0.03; for(let k=0;k<n;k++) noise({hp:2000+u*3000,len:0.006,gain:g*0.6*Math.pow(0.85,k),pan:pn,rev:0.15},pp,ac.currentTime+k*iv); break; }
     case 2: noise({bp:180+u*700,q:1.5,len:0.012+u*0.01,gain:g*0.9,pan:pn},pp); noise({hp:2000,len:0.004,gain:0.25,pan:pn},pp); break;
     case 3: noise({bp:900+u*2500,q:0.7,len:0.04+u*0.2,gain:g*0.35,pan:pn,rev:0.3},pp); break;
-    case 4: noise({bp:500+u*2500,q:0.6+u*0.6,len:0.3+u*0.5,gain:g*0.25,pan:pn,rev:0.4,fadeIn:0.03},pp); break;
-    case 5: chirp(0.3+u*0.7,pn,Object.assign(pp,{pitch:(u-0.5)*12})); break; } }
+    case 4: noise({hp:200+u*2500,len:0.08+u*0.5,gain:g*0.22,pan:pn,rev:0.2,fadeIn:0.01},pp); break;   // white noise puff, column = brightness/length
+    case 5: { let k=0, dt=0; const n=4+Math.floor(Math.random()*6); const acc=Math.random()<0.5; for(k=0;k<n;k++){ const r2=[0,0,1,2,3,4][Math.floor(Math.random()*6)]; const cc=Math.floor(Math.random()*GC); setTimeout(()=>glNote(cc,r2,0.5+Math.random()*0.4,true),dt); dt+=acc?30+k*k*8:160-k*14; } break; } } }
 function glSwell(c,r,v){ const m=instr.mac, pn=(c-(GC-1)/2)/(GC-1)*1.4*m.spread, u=c/(GC-1);
   if(instr.kind==='p'&&instr.voice==='vpiano'){ const stops=chordSemis(c,r).map(sm=>pianoHold(sm,v,pn,macPP(m))); return ()=>stops.forEach(f=>f()); }
   if(instr.kind==='p') return instr.voice==='revgtr'?revChord(cellSemi(c,r),v,pn,macPP(m),true):instr.voice==='robo'?robo(cellSemi(c,r),v,pn,macPP(m),true):instr.voice==='bed'?bed(cellSemi(c,r),v,pn,macPP(m),true):instr.voice==='sparkle'?sparkle(cellSemi(c,r),v,pn,macPP(m),true):swell(cellSemi(c,r),v,pn,macPP(m));
   if(instr.kind==='n'){ const pp=macPP(m,{voice:undefined});
-    if(r===4) return noise({bp:500+u*2500,q:0.6+u*0.6,len:1,gain:0.3,pan:pn,rev:0.4,fadeIn:0.05,hold:true},pp);
+    if(r===4) return noise({hp:200+u*2500,len:1,gain:0.22,pan:pn,rev:0.2,fadeIn:0.05,hold:true},pp);
+    if(r===5){ let on=true, rate=120, dir=1; const loop=()=>{ if(!on) return; const r2=[0,0,1,2,3,4][Math.floor(Math.random()*6)], cc=Math.floor(Math.random()*GC); glNote(cc,r2,0.4+Math.random()*0.5,true); rate*=dir>0?0.85:1.18; if(rate<28) dir=-1; if(rate>420) dir=1; if(Math.random()<0.08) dir=-dir; setTimeout(loop,rate*(0.7+Math.random()*0.6)); }; loop(); return ()=>{ on=false; }; }
     if(r===1){ let on=true; const loop=()=>{ if(!on) return; glNote(c,r,0.6,true); setTimeout(loop,90+(1-u)*160); }; loop(); return ()=>{ on=false; }; }
     if(r===0){ let on=true; const loop=()=>{ if(!on) return; glNote(c,r,0.5,true); setTimeout(loop,40+(1-u)*120); }; loop(); return ()=>{ on=false; }; } }
   return null; }
 function glHit(e){ const r=gl.getBoundingClientRect(); return {x:e.clientX-r.left,y:e.clientY-r.top}; }
 gl.addEventListener('pointerdown',e=>{ ensureAudio(); gl.setPointerCapture(e.pointerId); const {x,y}=glHit(e);
   if(x>GW-fxW()){ glPointers.set(e.pointerId,{fx:true}); glFx(x,y); return; }
-  const c=Math.min(GC-1,Math.floor(x/cellW())), rr=GR-1-Math.min(GR-1,Math.floor(y/cellH())); const st={fx:false,c,rr,t:performance.now(),stop:null,lx:x,ly:y,last:null}; glPointers.set(e.pointerId,st); st.last=glNote(c,rr,0.75,true,false); st.timer=setTimeout(()=>{ if(glPointers.get(e.pointerId)===st&&!st.stop) st.stop=glSwell(c,rr,0.7); },190); });
+  const c=Math.min(GC-1,Math.floor(x/cellW())), rr=GR-1-Math.min(GR-1,Math.floor(y/cellH())); const st={fx:false,c,rr,t:performance.now(),stop:null,lx:x,ly:y,last:null}; glPointers.set(e.pointerId,st); st.last=glNote(c,rr,0.75,true,false); st.timer=setTimeout(()=>{ if(glPointers.get(e.pointerId)===st&&!st.stop) st.stop=watchHold(glSwell(c,rr,0.7)); },190); });
 gl.addEventListener('pointermove',e=>{ const st=glPointers.get(e.pointerId); if(!st) return; const {x,y}=glHit(e); if(st.fx){ glFx(x,y); return; }
   const c=Math.min(GC-1,Math.max(0,Math.floor(x/cellW()))), rr=GR-1-Math.min(GR-1,Math.max(0,Math.floor(y/cellH())));
-  if(c!==st.c||rr!==st.rr){ const sp=Math.hypot(x-st.lx,y-st.ly)/Math.max(1,performance.now()-st.t); st.c=c; st.rr=rr; st.t=performance.now(); st.lx=x; st.ly=y; clearTimeout(st.timer); if(st.stop){ st.stop(); st.stop=null; } if(typeof st.last==='function') st.last(0.06); st.last=glNote(c,rr,Math.min(0.8,0.35+sp*0.35),true,true); st.timer=setTimeout(()=>{ if(glPointers.get(e.pointerId)===st&&!st.stop) st.stop=glSwell(c,rr,0.7); },190); } });
+  if(c!==st.c||rr!==st.rr){ const sp=Math.hypot(x-st.lx,y-st.ly)/Math.max(1,performance.now()-st.t); st.c=c; st.rr=rr; st.t=performance.now(); st.lx=x; st.ly=y; clearTimeout(st.timer); if(st.stop){ st.stop(); st.stop=null; } if(typeof st.last==='function') st.last(0.06); st.last=glNote(c,rr,Math.min(0.8,0.35+sp*0.35),true,true); st.timer=setTimeout(()=>{ if(glPointers.get(e.pointerId)===st&&!st.stop) st.stop=watchHold(glSwell(c,rr,0.7)); },190); } });
+const holdWatch=new Set(); function watchHold(stop){ if(typeof stop!=='function') return stop; const w={stop}; holdWatch.add(w); w.t=setTimeout(()=>{ try{stop();}catch(e){} holdWatch.delete(w); },20000); return ()=>{ clearTimeout(w.t); holdWatch.delete(w); stop(); }; }
+function stopAllHolds(){ for(const w of [...holdWatch]){ clearTimeout(w.t); try{w.stop();}catch(e){} holdWatch.delete(w); } for(const [id,st] of glPointers){ clearTimeout(st.timer); if(st.stop) try{st.stop();}catch(e){} } glPointers.clear(); for(const [id,h] of heldNames){ h.stop&&h.stop(); h.nm.classList.remove('lit'); } heldNames.clear(); }
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) stopAllHolds(); }); window.addEventListener('blur',stopAllHolds);
 const glUp=e=>{ const st=glPointers.get(e.pointerId); if(!st) return; clearTimeout(st.timer); if(st.stop) st.stop(); glPointers.delete(e.pointerId); if(st.fx&&![...glPointers.values()].some(p=>p.fx)){ setBend(0); glFxPos=null; applyDrive(); if(M) M.glp.frequency.setTargetAtTime(6000,ac.currentTime,0.1); } };
 gl.addEventListener('pointerup',glUp); gl.addEventListener('pointercancel',glUp);
 let glFxPos=null; function glFx(x,y){ const fx0=GW-fxW(); const u=Math.min(1,Math.max(0,(x-fx0)/fxW())), vv=Math.min(1,Math.max(0,1-y/GH)); glFxPos={u,vv}; setBend(Math.round((vv-0.5)*24)); glTone=u; if(M){ const t=ac.currentTime; const d=Math.max(instr.mac.drive,Math.max(0,u-0.5)*2); M.gdrive.curve=d<0.03?new Float32Array([-1,0,1]):satCurve(Math.pow(d,2)*0.9); M.glp.frequency.setTargetAtTime(600*Math.pow(25,u),t,0.03); } }
