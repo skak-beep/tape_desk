@@ -34,7 +34,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--mono);font-
 .pad{height:52px;border:1px solid var(--line);border-radius:4px;background:var(--bg-2);touch-action:none;cursor:pointer;display:flex;align-items:flex-end;padding:5px;box-sizing:border-box;font-size:10px;position:relative}
 .pad.sel{border-color:var(--acc);color:var(--acc)} .pad.lit{background:#2a1a10}
 /* arena */
-#arena{width:100%;height:220px;display:block;border:1px solid var(--line);touch-action:none} #glide{width:100%;height:330px;display:block;border:1px solid var(--line);touch-action:none;background:var(--bg)} #glide[hidden],#glide-row[hidden]{display:none!important} #arena[hidden],#arena-row[hidden],#grid[hidden],.pane[hidden]{display:none!important}
+#arena{width:100%;height:220px;display:block;border:1px solid var(--line);touch-action:none} #glide{width:100%;height:330px;display:block;border:1px solid var(--line);touch-action:none;background:var(--bg)} #glide[hidden],#glide-row[hidden]{display:none!important} .chips{display:flex;gap:5px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch} .chips button{flex:none;padding:9px 11px;min-height:38px;font-size:11px;white-space:nowrap} #arena[hidden],#arena-row[hidden],#grid[hidden],.pane[hidden]{display:none!important}
 .fx{display:grid;grid-template-columns:repeat(4,1fr);gap:6px} .fx button{min-height:46px;font-size:11px;touch-action:none;padding:8px 4px}
 .fx button small{display:block;color:var(--dim);font-size:9px;margin-top:3px} .fx button.hold{background:var(--acc);border-color:var(--acc);color:#0a0a0b} .fx button.hold small{color:#3a2412}
 .knobs{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
@@ -81,7 +81,23 @@ input[type=range]{flex:1;min-width:60px;accent-color:var(--acc);height:28px;marg
     <div class="grid" id="grid"></div>
     <canvas id="arena" hidden></canvas>
     <canvas id="glide" hidden></canvas>
-    <div class="row" id="glide-row" hidden><span class="lbl">Scale</span><button id="gl-scale">ペンタ</button><span class="lbl" style="margin-left:6px">Voice</span><button id="gl-voice">Pluck</button><span class="lbl" style="margin-left:auto;text-transform:none">なぞる=連打 · 止める=膨らむ · 右の帯=2本目の指(上下=ピッチ、左右=明るさ/歪み)</span></div>
+    <div id="glide-row" hidden>
+      <div class="chips" id="instr"></div>
+      <div class="row" style="margin-top:6px"><button id="gl-scale">ペンタ</button><button id="b-mac">音色</button><span class="lbl" style="margin-left:auto;text-transform:none">なぞる=連打 · 止める=膨らむ/続く · 右の帯=2本目の指(↕ピッチ ↔明るさ/歪み)</span></div>
+      <div id="macro" class="editor" hidden>
+        <div class="hd"><span id="mac-name">—</span><span><button id="mac-reset">Reset</button></span></div>
+        <div class="row">
+          <label class="kn"><span>Attack</span><input data-mac="att" type="range" min="0" max="1" step="0.01"></label>
+          <label class="kn"><span>Decay</span><input data-mac="dec" type="range" min="0" max="1" step="0.01"></label>
+          <label class="kn"><span>Bright</span><input data-mac="bright" type="range" min="0" max="1" step="0.01"></label>
+          <label class="kn"><span>Wobble</span><input data-mac="wob" type="range" min="0" max="1" step="0.01"></label>
+          <label class="kn"><span>Drive</span><input data-mac="drive" type="range" min="0" max="1" step="0.01"></label>
+          <label class="kn"><span>Reverb</span><input data-mac="rev" type="range" min="0" max="1" step="0.01"></label>
+          <label class="kn"><span>Octave</span><input data-mac="oct" type="range" min="-2" max="2" step="1"></label>
+          <label class="kn"><span>Spread</span><input data-mac="spread" type="range" min="0" max="1" step="0.01"></label>
+        </div>
+      </div>
+    </div>
     <div class="row" id="arena-row" hidden><span class="lbl">Balls</span><button id="a-bm">−</button><button id="a-balls">4</button><button id="a-bp">+</button><button id="a-shape">Oct</button><button id="a-grav">Grav 60</button><button id="a-kick">Kick</button></div>
     <div class="lbl" id="arena-help" hidden style="text-transform:none">▶ Run で玉が動き、壁に当たると鳴ります。壁の音=下の8行。行を選んで Edit → Source で、どのセットのどの音を壁にするか選べます。</div>
     <div class="row">
@@ -168,7 +184,7 @@ let toastT; const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add(
 document.querySelectorAll('.tabs span').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tabs span').forEach(x=>x.classList.toggle('on',x===t));document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===t.dataset.tab));});
 const KEYS=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; let key=0; const hz=m=>440*Math.pow(2,(m-69)/12), root=()=>48+key;
 const P={dark:50,rev:60,tape:50,decay:100,rate:120,vol:70}; const dec=()=>P.decay/100;
-let loopLen=30, loopStart=0, playing=false, layers=[], sample=null, sampleRev=null, curSet='tone', autoOn=false;
+let loopLen=30, loopStart=0, playing=false, layers=[], sample=null, sampleRev=null, curSet='glide', autoOn=false;
 const PP=()=>({pitch:0,tone:0.5,decay:1,cut:1,level:1,pan:0,rev:1,vel:0.7,reverse:false,clean:false,voice:'bell',glide:false});
 
 /* ---------- audio ---------- */
@@ -208,16 +224,25 @@ function tone(semi,v,pn,pp,at){ pp=pp||PP(); const t=at||ac.currentTime, f=hz(ro
     pad:   {p:[[1,1,-3,0],[1,0.8,3,0],[2,0.15,0,0],[0.5,0.3,0,0]],att:0.6,dur:2.5+v*2},
     breath:{p:[[1,1,0,0],[1,0.4,5,0],[2,0.1,0,0]],att:0.9,dur:3+v*2},
     subbell:{p:[[0.5,1,0,0],[1,0.6,0,0],[2,0.2,0,0.8],[3,0.08,0,0.3]],att:0.01,dur:3.5+v*1.5},
-    pluck: {p:[[1,1,0,0],[2,0.22,0,0.09],[3,0.07,0,0.05]],att:0.004,dur:0.32+v*0.3} }[kind]||null;
-  const spec=V||{p:[[1,1,0,0]],att:0.01,dur:2}; const dur=spec.dur*dec()*pp.decay, out=gate(t,dur,pp,pn), g=ac.createGain(); const lvl=(kind==='pad'||kind==='breath'?0.22:0.3)*(0.4+v*0.6)*pp.level;
-  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(lvl,t+spec.att); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-  const bright=0.3+pp.tone*1.2; for(const [mul,gain,det,dc] of spec.p){ const gg=gain*(mul>1?bright:1); if(gg<0.004) continue; const o=ac.createOscillator(); o.type='sine'; o.frequency.value=f*mul; o.detune.value=det+(pp.glide?bend*100:0); const og=ac.createGain(); og.gain.setValueAtTime(gg,t); if(dc) og.gain.setTargetAtTime(0.0001,t+spec.att,dc*dec()); o.connect(og).connect(g); o.start(t); o.stop(t+dur+0.1); if(pp.glide){ bendable.add({o,det}); o.onended=()=>{ for(const b of bendable) if(b.o===o) bendable.delete(b); }; } }
+    pluck: {p:[[1,1,0,0],[2,0.22,0,0.09],[3,0.07,0,0.05]],att:0.004,dur:0.32+v*0.3},
+    tapeRev:{p:[[1,1,0,0],[2,0.5,0,0],[3,0.22,0,0],[0.5,0.3,0,0]],att:0.7,dur:1.0+v*0.7,lp:1600,wob:0.5,rev:true},
+    tapeKeys:{p:[[1,1,0,0],[2,0.5,0,0],[3,0.28,0,0],[4,0.12,0,0],[5,0.06,0,0]],att:0.05,dur:1.3+v*0.9,lp:1400,wob:0.35},
+    choir:  {p:[[1,1,-7,0],[1,1,7,0],[2,0.3,0,0],[3,0.1,0,0]],att:0.45,dur:2.6+v*1.5,lp:2200,wob:0.25},
+    organ:  {p:[[1,1,0,0],[2,0.6,0,0],[3,0.4,0,0],[4,0.3,0,0],[6,0.1,0,0]],att:0.03,dur:1.1+v*0.8,lp:3000,wob:0.15,trem:true},
+    sub:    {p:[[0.5,1,0,0],[1,0.3,0,0],[2,0.05,0,0.3]],att:0.012,dur:1.2+v*0.8} }[kind]||null;
+  const spec=V||{p:[[1,1,0,0]],att:0.01,dur:2}; const dur=spec.dur*dec()*pp.decay, att=Math.min(dur*0.8,spec.att*(pp.attMul||1)), out=gate(t,dur,pp,pn), g=ac.createGain(); const lvl=(kind==='pad'||kind==='breath'||kind==='choir'?0.22:0.3)*(0.4+v*0.6)*pp.level;
+  if(spec.rev){ g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(lvl,t+dur*0.9); g.gain.setValueAtTime(0,t+dur*0.9+0.004); }   // tape played backwards: swells up, then cuts
+  else { g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(lvl,t+att); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); }
+  const wobAmt=(pp.wob!==undefined?pp.wob:(spec.wob||0)); let wobG=null; if(wobAmt>0){ const lfo=ac.createOscillator(); lfo.frequency.value=spec.wob?0.6+Math.random()*0.8:4.5+Math.random(); wobG=ac.createGain(); wobG.gain.value=wobAmt*(spec.wob?40:12); lfo.connect(wobG); lfo.start(t); lfo.stop(t+dur+0.2); if(spec.wob){ const fl=ac.createOscillator(); fl.frequency.value=7+Math.random()*3; const fg=ac.createGain(); fg.gain.value=wobAmt*6; fl.connect(fg).connect(wobG); fl.start(t); fl.stop(t+dur+0.2); } }
+  let dest=g; if(spec.lp){ const nlp=ac.createBiquadFilter(); nlp.type='lowpass'; nlp.frequency.value=spec.lp*(0.5+pp.tone*1.4); nlp.Q.value=0.8; nlp.connect(g); dest=nlp; }
+  if(spec.trem){ const tr=ac.createOscillator(); tr.frequency.value=5.5; const tg=ac.createGain(); tg.gain.value=0.35; const base=ac.createGain(); base.gain.value=0.65; tr.connect(tg).connect(base.gain); const old=dest; dest=ac.createGain(); dest.connect(base); base.connect(old); tr.start(t); tr.stop(t+dur+0.2); }
+  const bright=0.3+pp.tone*1.2; for(const [mul,gain,det,dc] of spec.p){ const gg=gain*(mul>1?bright:1); if(gg<0.004) continue; const o=ac.createOscillator(); o.type=(kind==='tapeKeys'&&mul>=2)?'triangle':'sine'; o.frequency.value=f*mul; const bd=det+(pp.glide?bend*100:0); if(spec.rev){ o.detune.setValueAtTime(bd-350,t); o.detune.linearRampToValueAtTime(bd,t+dur*0.85); } else o.detune.value=bd; if(wobG) wobG.connect(o.detune); const og=ac.createGain(); og.gain.setValueAtTime(gg,t); if(dc) og.gain.setTargetAtTime(0.0001,t+att,dc*dec()); o.connect(og).connect(dest); o.start(t); o.stop(t+dur+0.1); if(pp.glide){ const e={o,det}; bendable.add(e); o.onended=()=>bendable.delete(e); } }
   if(kind==='breath'){ const n=ac.createBufferSource(); n.buffer=noiseB; n.loop=true; const bp=ac.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=f*2; bp.Q.value=6; const ng=ac.createGain(); ng.gain.value=0.25; n.connect(bp).connect(ng).connect(g); n.start(t); n.stop(t+dur+0.1); }
   g.connect(out); revSend(g,1.4*pp.rev); }
 let bend=0; const bendable=new Set();
 function setBend(semi){ bend=semi; const t=ac.currentTime; for(const b of bendable) b.o.detune.setTargetAtTime(b.det+bend*100,t,0.02); }
-function swell(semi,v,pn,pp){ pp=pp||PP(); const t=ac.currentTime, f=hz(root()+12+semi+pp.pitch), g=ac.createGain(), out=gate(t,4,{...pp,reverse:false,cut:1},pn); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.26*(0.5+v*0.5)*pp.level,t+0.35+0.4*(1-v));
-  const vib=ac.createOscillator(); vib.frequency.value=4.6; const vg=ac.createGain(); vg.gain.setValueAtTime(0,t); vg.gain.linearRampToValueAtTime(5,t+1.2); vib.connect(vg); vib.start(t); const oscs=[];
+function swell(semi,v,pn,pp){ pp=pp||PP(); const t=ac.currentTime, f=hz(root()+12+semi+pp.pitch), g=ac.createGain(), out=gate(t,4,{...pp,reverse:false,cut:1},pn); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.26*(0.5+v*0.5)*pp.level,t+(0.35+0.4*(1-v))*(pp.attMul||1));
+  const vib=ac.createOscillator(); vib.frequency.value=(pp.wob||0)>0.3?0.9:4.6; const vg=ac.createGain(); vg.gain.setValueAtTime(0,t); vg.gain.linearRampToValueAtTime(5+(pp.wob||0)*35,t+1.2); vib.connect(vg); vib.start(t); const oscs=[];
   for(const [mul,gain,det] of [[1,1,0],[1,0.35,4],[2,0.12+pp.tone*0.2,0],[3,0.03,0]]){ const o=ac.createOscillator(); o.type='sine'; o.frequency.value=f*mul; o.detune.value=det+bend*100; vg.connect(o.detune); const og=ac.createGain(); og.gain.value=gain; o.connect(og).connect(g); o.start(t); oscs.push(o); const e={o,det}; bendable.add(e); o.onended=()=>bendable.delete(e); }
   g.connect(out); revSend(g,1.6*pp.rev); return ()=>{ const tt=ac.currentTime; g.gain.cancelScheduledValues(tt); g.gain.setTargetAtTime(0.0001,tt,0.35); oscs.forEach(o=>o.stop(tt+2)); vib.stop(tt+2); }; }
 function noise(o,pp,at){ pp=pp||PP(); const t=at||ac.currentTime, n=ac.createBufferSource(); n.buffer=noiseB; n.loop=true; const f=ac.createBiquadFilter(), fm=Math.pow(2,pp.pitch/12)*(0.5+pp.tone); if(o.bp){ f.type='bandpass'; f.frequency.value=o.bp*fm; f.Q.value=o.q||1; } else { f.type='highpass'; f.frequency.value=(o.hp||1000)*fm; }
@@ -265,9 +290,9 @@ const SETS={
   glide:{name:'なぞる',pads:PENTA.slice(0,8).map((semi,i)=>mk(KEYS[(key+semi)%12],'pluck',(v,pn,pp,at)=>tone(semi,v,pn,pp,at),{clean:true,glide:true,voice:'pluck',rev:1.2}))},
   orbit:{name:'軌道',pads:PENTA.slice(0,8).map((semi,i)=>{ const o=mk(KEYS[(key+semi)%12],'wall',null,{clean:true}); o.src={set:'pure',idx:i}; o.f=(v,pn,pp,at)=>{ const sp=SETS[o.src.set].pads[o.src.idx]; return sp.f(v,pn,{...sp.p,pitch:sp.p.pitch+pp.pitch,level:sp.p.level*pp.level,decay:sp.p.decay*pp.decay,reverse:pp.reverse,cut:pp.cut},at); }; return o; })},
 };
-let selected={set:'tone',idx:0}, editMode=false, latch=true; const selPad=()=>SETS[selected.set].pads[selected.idx];
+let selected={set:'glide',idx:0}, editMode=false, latch=true; const selPad=()=>SETS[selected.set].pads[selected.idx];
 const setsEl=$('#sets'), gridEl=$('#grid'), padsEl=$('#pads'); const heldCells=new Set();
-Object.entries(SETS).forEach(([id,s])=>{ const b=document.createElement('button'); b.textContent=s.name; b.dataset.set=id; b.onclick=()=>{ curSet=id; if(selected.set!==id){ selected={set:id,idx:0}; } build(); }; setsEl.appendChild(b); });
+[['glide',SETS.glide],...Object.entries(SETS).filter(([k])=>k!=='glide')].forEach(([id,s])=>{ const b=document.createElement('button'); b.textContent=s.name; b.dataset.set=id; b.onclick=()=>{ curSet=id; if(selected.set!==id){ selected={set:id,idx:0}; } build(); }; setsEl.appendChild(b); });
 const MULTS=[0.25,0.5,1,2,4], multLabel=m=>m===0.25?'¼':m===0.5?'½':'×'+m;
 function build(){ setsEl.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.set===curSet)); SETS.tone.pads.forEach((p,i)=>p.l=KEYS[(key+PENTA[i])%12]); SETS.pure.pads.forEach((p,i)=>p.l=KEYS[(key+PENTA[i])%12]); SETS.glide.pads.forEach((p,i)=>p.l=KEYS[(key+PENTA[i])%12]); SETS.orbit.pads.forEach((p,i)=>{ const sp=SETS[p.src.set].pads[p.src.idx]; p.l=sp.l; p.s=SETS[p.src.set].name; });
   const isOrbit=curSet==='orbit', isGlide=curSet==='glide'; $('#arena').hidden=!isOrbit; $('#arena-row').hidden=!isOrbit; $('#arena-help').hidden=!isOrbit; if(isOrbit) requestAnimationFrame(arenaResize); $('#glide').hidden=!isGlide; $('#glide-row').hidden=!isGlide; gridEl.hidden=isGlide; if(isGlide) requestAnimationFrame(glResize);
@@ -336,15 +361,38 @@ $('#a-shape').onclick=e=>{ shapeI=(shapeI+1)%SHAPES.length; e.target.textContent
 $('#a-grav').onclick=e=>{ grav=grav>=100?20:grav+20; e.target.textContent='Grav '+grav; };
 
 /* ---------- glide surface: a lattice of consonant neighbours; drag = runs of short notes, hold = swell; 2nd finger = bend + tone ---------- */
-const gl=$('#glide'), gg=gl.getContext('2d'); let GW=0,GH=0; const GC=6, GR=6; let glScale='penta', glVoice='pluck';
+const INSTR=[
+  {id:'pluck',name:'Pluck',kind:'p',voice:'pluck'},{id:'glass',name:'Glass',kind:'p',voice:'glass'},{id:'piano',name:'Piano',kind:'p',voice:'piano'},{id:'box',name:'Music box',kind:'p',voice:'box'},{id:'chime',name:'Chime',kind:'p',voice:'chime'},{id:'harp',name:'Harp',kind:'p',voice:'harp'},{id:'bell',name:'Bell',kind:'p',voice:'bell'},{id:'pad',name:'Pad',kind:'p',voice:'pad'},
+  {id:'tapeRev',name:'テープ逆',kind:'p',voice:'tapeRev',m:{wob:0.5,bright:0.4,rev:0.7}},{id:'tapeKeys',name:'テープ鍵盤',kind:'p',voice:'tapeKeys',m:{wob:0.35,bright:0.4}},{id:'choir',name:'カセット合唱',kind:'p',voice:'choir',m:{wob:0.25,att:0.7}},{id:'organ',name:'VHSオルガン',kind:'p',voice:'organ',m:{wob:0.15}},{id:'sub',name:'サブ',kind:'p',voice:'sub',m:{oct:-1,rev:0.2}},
+  {id:'noise',name:'ノイズ',kind:'n'},{id:'grain',name:'粒',kind:'g'} ];
+const MAC=()=>({att:0.5,dec:0.5,bright:0.5,wob:0,drive:0,rev:0.6,oct:0,spread:0.6}); INSTR.forEach(i=>i.mac=Object.assign(MAC(),i.m||{}));
+let instr=INSTR[0]; const macPP=(m,extra)=>Object.assign(PP(),{clean:true,glide:true,voice:instr.voice,tone:m.bright,decay:0.3+m.dec*2.2,rev:m.rev*2,pitch:m.oct*12,attMul:Math.pow(6.3,(m.att-0.5)*2),wob:m.wob},extra||{});
+function applyDrive(){ if(!M) return; const u=instr.mac.drive; M.gdrive.curve=u<0.03?new Float32Array([-1,0,1]):satCurve(Math.pow(u,2)*0.9); }
+const gl=$('#glide'), gg=gl.getContext('2d'); let GW=0,GH=0; const GC=6, GR=6; let glScale='penta';
 const SC={penta:[0,3,5,7,10],minor:[0,2,3,5,7,8,10]};
 function glResize(){ const r=gl.getBoundingClientRect(); if(!r.width) return; const d=Math.min(2,devicePixelRatio||1); GW=r.width;GH=r.height; gl.width=GW*d; gl.height=GH*d; gg.setTransform(d,0,0,d,0,0); }
 new ResizeObserver(glResize).observe(gl);
 const fxW=()=>Math.max(54,GW*0.2), cellW=()=>(GW-fxW())/GC, cellH=()=>GH/GR;
 function cellSemi(c,r){ const sc=SC[glScale], step=glScale==='penta'?2:3; const deg=c+step*r; return 12*Math.floor(deg/sc.length)+sc[deg%sc.length]-12; }  // from C3 up ~2.5 octaves
 const glPointers=new Map(); let glTone=0.5; const lit=new Map();
-function glNote(c,r,v,quick){ const semi=cellSemi(c,r), pp=Object.assign(PP(),{clean:true,glide:true,voice:glVoice,tone:glTone,rev:1.2}); const pn=(c-(GC-1)/2)/(GC-1)*1.2; lit.set(c+':'+r,1); if(quick) tone(semi,v,pn,pp); return ()=>{}; }
-function glSwell(c,r,v){ const semi=cellSemi(c,r), pp=Object.assign(PP(),{clean:true,glide:true,tone:glTone,rev:1.2}); const pn=(c-(GC-1)/2)/(GC-1)*1.2; return swell(semi,v,pn,pp); }
+const NROWS=['ツ','ツツツ','プツッ','ザッ','ザー','ピチー'];
+function glNote(c,r,v,quick){ const m=instr.mac, pn=(c-(GC-1)/2)/(GC-1)*1.4*m.spread; lit.set(c+':'+r,1); const u=c/(GC-1);
+  if(instr.kind==='p'){ const pp=macPP(m); tone(cellSemi(c,r),v,pn,pp); return; }
+  if(instr.kind==='g'){ if(!sample){ toast('出力タブ「粒の素材」で録音かファイルを入れてください'); return; } const pp=macPP(m,{pitch:[-12,-7,0,0,7,12][r]+m.oct*12,voice:undefined}); grain(Math.min(7,c),v,pn,pp); return; }
+  const pp=macPP(m,{voice:undefined}); const g=0.35+v*0.5; // noise palette: row = kind, column = variation
+  switch(r){ case 0: noise({hp:1200+u*5000,len:0.003+u*0.004,gain:g*0.5,pan:pn},pp); break;
+    case 1: { const n=2+Math.round(u*5), iv=0.028+(1-u)*0.03; for(let k=0;k<n;k++) noise({hp:2000+u*3000,len:0.006,gain:g*0.6*Math.pow(0.85,k),pan:pn,rev:0.15},pp,ac.currentTime+k*iv); break; }
+    case 2: noise({bp:180+u*700,q:1.5,len:0.012+u*0.01,gain:g*0.9,pan:pn},pp); noise({hp:2000,len:0.004,gain:0.25,pan:pn},pp); break;
+    case 3: noise({bp:900+u*2500,q:0.7,len:0.04+u*0.2,gain:g*0.35,pan:pn,rev:0.3},pp); break;
+    case 4: noise({bp:500+u*2500,q:0.6+u*0.6,len:0.3+u*0.5,gain:g*0.25,pan:pn,rev:0.4,fadeIn:0.03},pp); break;
+    case 5: chirp(0.3+u*0.7,pn,Object.assign(pp,{pitch:(u-0.5)*12})); break; } }
+function glSwell(c,r,v){ const m=instr.mac, pn=(c-(GC-1)/2)/(GC-1)*1.4*m.spread, u=c/(GC-1);
+  if(instr.kind==='p') return swell(cellSemi(c,r),v,pn,macPP(m));
+  if(instr.kind==='n'){ const pp=macPP(m,{voice:undefined});
+    if(r===4) return noise({bp:500+u*2500,q:0.6+u*0.6,len:1,gain:0.3,pan:pn,rev:0.4,fadeIn:0.05,hold:true},pp);
+    if(r===1){ let on=true; const loop=()=>{ if(!on) return; glNote(c,r,0.6,true); setTimeout(loop,90+(1-u)*160); }; loop(); return ()=>{ on=false; }; }
+    if(r===0){ let on=true; const loop=()=>{ if(!on) return; glNote(c,r,0.5,true); setTimeout(loop,40+(1-u)*120); }; loop(); return ()=>{ on=false; }; } }
+  return null; }
 function glHit(e){ const r=gl.getBoundingClientRect(); return {x:e.clientX-r.left,y:e.clientY-r.top}; }
 gl.addEventListener('pointerdown',e=>{ ensureAudio(); gl.setPointerCapture(e.pointerId); const {x,y}=glHit(e);
   if(x>GW-fxW()){ glPointers.set(e.pointerId,{fx:true}); glFx(x,y); return; }
@@ -352,14 +400,20 @@ gl.addEventListener('pointerdown',e=>{ ensureAudio(); gl.setPointerCapture(e.poi
 gl.addEventListener('pointermove',e=>{ const st=glPointers.get(e.pointerId); if(!st) return; const {x,y}=glHit(e); if(st.fx){ glFx(x,y); return; }
   const c=Math.min(GC-1,Math.max(0,Math.floor(x/cellW()))), rr=GR-1-Math.min(GR-1,Math.max(0,Math.floor(y/cellH())));
   if(c!==st.c||rr!==st.rr){ const sp=Math.hypot(x-st.lx,y-st.ly)/Math.max(1,performance.now()-st.t); st.c=c; st.rr=rr; st.t=performance.now(); st.lx=x; st.ly=y; clearTimeout(st.timer); if(st.stop){ st.stop(); st.stop=null; } glNote(c,rr,Math.min(1,0.45+sp*0.4),true); st.timer=setTimeout(()=>{ if(glPointers.get(e.pointerId)===st&&!st.stop) st.stop=glSwell(c,rr,0.7); },260); } });
-const glUp=e=>{ const st=glPointers.get(e.pointerId); if(!st) return; clearTimeout(st.timer); if(st.stop) st.stop(); glPointers.delete(e.pointerId); if(st.fx&&![...glPointers.values()].some(p=>p.fx)){ setBend(0); } };
+const glUp=e=>{ const st=glPointers.get(e.pointerId); if(!st) return; clearTimeout(st.timer); if(st.stop) st.stop(); glPointers.delete(e.pointerId); if(st.fx&&![...glPointers.values()].some(p=>p.fx)){ setBend(0); glFxPos=null; applyDrive(); if(M) M.glp.frequency.setTargetAtTime(6000,ac.currentTime,0.1); } };
 gl.addEventListener('pointerup',glUp); gl.addEventListener('pointercancel',glUp);
-let glFxPos=null; function glFx(x,y){ const fx0=GW-fxW(); const u=Math.min(1,Math.max(0,(x-fx0)/fxW())), vv=Math.min(1,Math.max(0,1-y/GH)); glFxPos={u,vv}; setBend(Math.round((vv-0.5)*24)); glTone=u; if(M){ const t=ac.currentTime; M.gdrive.curve=u<0.03?new Float32Array([-1,0,1]):satCurve(Math.pow(u,2)*0.9); M.glp.frequency.setTargetAtTime(1200*Math.pow(12,u),t,0.03); } }
+let glFxPos=null; function glFx(x,y){ const fx0=GW-fxW(); const u=Math.min(1,Math.max(0,(x-fx0)/fxW())), vv=Math.min(1,Math.max(0,1-y/GH)); glFxPos={u,vv}; setBend(Math.round((vv-0.5)*24)); glTone=u; if(M){ const t=ac.currentTime; const d=Math.max(instr.mac.drive,Math.max(0,u-0.5)*2); M.gdrive.curve=d<0.03?new Float32Array([-1,0,1]):satCurve(Math.pow(d,2)*0.9); M.glp.frequency.setTargetAtTime(600*Math.pow(25,u),t,0.03); } }
 $('#gl-scale').onclick=e=>{ glScale=glScale==='penta'?'minor':'penta'; e.target.textContent=glScale==='penta'?'ペンタ':'マイナー'; };
-$('#gl-voice').onclick=e=>{ const vs=['pluck','glass','box','piano','harp','chime','bell']; glVoice=vs[(vs.indexOf(glVoice)+1)%vs.length]; e.target.textContent=glVoice[0].toUpperCase()+glVoice.slice(1); };
+const instrEl=$('#instr'); INSTR.forEach(it=>{ const b=document.createElement('button'); b.textContent=it.name; b.dataset.i=it.id; b.onclick=()=>{ instr=it; ensureAudio(); applyDrive(); renderInstr(); }; instrEl.appendChild(b); });
+function renderInstr(){ instrEl.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.i===instr.id)); $('#mac-name').textContent=instr.name; document.querySelectorAll('[data-mac]').forEach(r=>r.value=instr.mac[r.dataset.mac]); $('#gl-scale').hidden=instr.kind!=='p'; }
+document.querySelectorAll('[data-mac]').forEach(r=>r.oninput=()=>{ instr.mac[r.dataset.mac]=+r.value; if(r.dataset.mac==='drive') applyDrive(); });
+$('#b-mac').onclick=()=>{ const m=$('#macro'); m.hidden=!m.hidden; $('#b-mac').classList.toggle('on',!m.hidden); };
+$('#mac-reset').onclick=()=>{ instr.mac=Object.assign(MAC(),instr.m||{}); applyDrive(); renderInstr(); };
+renderInstr();
 function drawGlide(){ if(!GW) glResize(); if(!GW||$('#glide').hidden) return; gg.clearRect(0,0,GW,GH); const cw=cellW(), ch=cellH(), fx0=GW-fxW(), acc=css('--acc'), fg=css('--fg'), dim=css('--dim'), line=css('--line');
   for(let c=0;c<GC;c++) for(let r=0;r<GR;r++){ const x=c*cw, y=(GR-1-r)*ch; const k=c+':'+r; const a=lit.get(k)||0; gg.strokeStyle=line; gg.strokeRect(x+0.5,y+0.5,cw-1,ch-1); if(a>0){ gg.fillStyle=acc; gg.globalAlpha=a*0.5; gg.fillRect(x+1,y+1,cw-2,ch-2); gg.globalAlpha=1; lit.set(k,a-0.05); if(a<=0.05) lit.delete(k); }
-    const semi=cellSemi(c,r); const name=KEYS[((key+semi)%12+12)%12], oct=4+Math.floor((semi+key)/12); gg.fillStyle=semi%12===0?fg:dim; gg.font=(semi%12===0?'600 ':'')+'11px '+css('--mono'); gg.textAlign='center'; gg.textBaseline='middle'; gg.fillText(name+oct,x+cw/2,y+ch/2); }
+    let label='', strong=false; if(instr.kind==='p'){ const semi=cellSemi(c,r); label=KEYS[((key+semi)%12+12)%12]+(4+Math.floor((semi+key)/12)); strong=semi%12===0; } else if(instr.kind==='n'){ label=c===0?NROWS[r]:(r===1?(2+Math.round(c/(GC-1)*5))+'連':'·'.repeat(c)); strong=c===0; } else { label=c===0?['−8va','−5','0','0','+5','+8va'][r]:'粒'+(c+1); strong=c===0; }
+    gg.fillStyle=strong?fg:dim; gg.font=(strong?'600 ':'')+'11px '+css('--mono'); gg.textAlign='center'; gg.textBaseline='middle'; gg.fillText(label,x+cw/2,y+ch/2); }
   gg.fillStyle='#0e0e0f'; gg.fillRect(fx0,0,fxW(),GH); gg.strokeStyle=line; gg.strokeRect(fx0+0.5,0.5,fxW()-1,GH-1); gg.fillStyle=dim; for(let y=12;y<GH;y+=12) for(let x=fx0+10;x<GW-6;x+=12){ gg.beginPath(); gg.arc(x,y,0.7,0,6.283); gg.fill(); }
   gg.strokeStyle=dim; gg.setLineDash([2,4]); gg.beginPath(); gg.moveTo(fx0,GH/2+0.5); gg.lineTo(GW,GH/2+0.5); gg.stroke(); gg.setLineDash([]);
   gg.fillStyle=dim; gg.font='9px '+css('--mono'); gg.textAlign='center'; gg.fillText('+12',fx0+fxW()/2,10); gg.fillText('−12',fx0+fxW()/2,GH-8); gg.save(); gg.translate(fx0+8,GH/2); gg.rotate(-Math.PI/2); gg.fillText('BEND ↕ · TONE ↔',0,0); gg.restore();
@@ -401,7 +455,7 @@ document.querySelectorAll('[data-rl]').forEach(b=>b.onclick=()=>{ recLen=+b.data
 function rec(on){ ensureAudio(); if(on===recording) return; recording=on; $('#b-rec').classList.toggle('on',on); $('#b-rec').textContent=on?'■ Stop':'● Rec phrase';
   if(on){ recMax=Math.floor((recLen||120)*ac.sampleRate); recL=new Float32Array(recMax); recR=new Float32Array(recMax); recIdx=0; recStart=ac.currentTime+0.05; toast(recLen?recLen+'秒 録音中':'録音中(■で止める)'); }
   else if(recL){ const n=Math.max(1,recIdx); let peak=0; for(let i=0;i<n;i+=53) peak=Math.max(peak,Math.abs(recL[i]),Math.abs(recR[i])); if(peak<0.003||n<ac.sampleRate*0.2){ toast('何も鳴らなかったので、フレーズは作りませんでした'); recL=recR=null; return; }
-    const buf=ac.createBuffer(2,n,ac.sampleRate); buf.copyToChannel(recL.subarray(0,n),0); buf.copyToChannel(recR.subarray(0,n),1); recL=recR=null; addClip(buf,SETS[curSet].name); } }
+    const buf=ac.createBuffer(2,n,ac.sampleRate); buf.copyToChannel(recL.subarray(0,n),0); buf.copyToChannel(recR.subarray(0,n),1); recL=recR=null; addClip(buf,curSet==='glide'?instr.name:SETS[curSet].name); } }
 $('#b-rec').onclick=()=>rec(!recording);
 let micRec=null; $('#b-micclip').onclick=async()=>{ ensureAudio(); if(micRec){ micRec.stop(); return; } if(!navigator.mediaDevices?.getUserMedia){ toast('マイクが使えない環境です'); return; }
   try{ const st=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}}); const ch=[]; micRec=new MediaRecorder(st); micRec.ondataavailable=ev=>{if(ev.data.size)ch.push(ev.data);};
@@ -412,7 +466,7 @@ let micRec=null; $('#b-micclip').onclick=async()=>{ ensureAudio(); if(micRec){ m
 const COLORS={'綺麗':'#e0a92a','澄':'#f2e6c8','なぞる':'#ffd27a','ノイズ':'#dcd7cb','低音':'#5aa0b0','粒':'#e5668f','軌道':'#4fae68','マイク':'#ff7a1a'};
 let clips=[], sel=null, tlLen=60, head=0, tlPlaying=false, tlLoop=false, tlStartAt=0, tlHeadAt=0, zoom=1, scrollX=0; const LANES=6, LANE_H=44, RULER=18;
 function addClip(buf,name){ const dur=buf.duration; let lane=0; for(lane=0;lane<LANES;lane++){ if(!clips.some(c=>c.lane===lane&&c.start<head+dur&&c.start+c.len>head)) break; } if(lane>=LANES) lane=LANES-1;
-  const c={id:Date.now()+Math.random(),buf,rbuf:null,name,color:COLORS[name]||'#dcd7cb',start:snap(head),lane,offset:0,len:dur,gain:1,fi:0.02,fo:0.05,rep:1,reverse:false,muted:false}; clips.push(c); sel=c; if(c.start+c.len>tlLen){ tlLen=Math.ceil((c.start+c.len)/30)*30; $('#t-len').value=String(Math.min(120,tlLen)); } renderClipbar(); $('#r-n').textContent=clips.length; toast(name+' を '+c.start.toFixed(1)+'s のレーン'+(lane+1)+'に置きました'); if(tlPlaying) restartPlayback(); }
+  const c={id:Date.now()+Math.random(),buf,rbuf:null,name,color:COLORS[name]||(curSet==='glide'?'#ffd27a':'#dcd7cb'),start:snap(head),lane,offset:0,len:dur,gain:1,fi:0.02,fo:0.05,rep:1,reverse:false,muted:false}; clips.push(c); sel=c; if(c.start+c.len>tlLen){ tlLen=Math.ceil((c.start+c.len)/30)*30; $('#t-len').value=String(Math.min(120,tlLen)); } renderClipbar(); $('#r-n').textContent=clips.length; toast(name+' を '+c.start.toFixed(1)+'s のレーン'+(lane+1)+'に置きました'); if(tlPlaying) restartPlayback(); }
 const snap=v=>{ const s=+$('#t-snap').value; return s?Math.round(v/s)*s:v; };
 function clipBuf(c){ if(!c.reverse) return c.buf; if(!c.rbuf){ const b=c.buf; c.rbuf=ac.createBuffer(b.numberOfChannels,b.length,b.sampleRate); for(let ch=0;ch<b.numberOfChannels;ch++){ const s=b.getChannelData(ch), d=c.rbuf.getChannelData(ch); for(let i=0,n=s.length;i<n;i++) d[i]=s[n-1-i]; } } return c.rbuf; }
 
