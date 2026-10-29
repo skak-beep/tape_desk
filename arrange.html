@@ -14,7 +14,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--mono);font-
 .top .r{margin-left:auto;color:var(--dim);font-size:11px;white-space:nowrap} .top .r b{color:var(--fg);font-weight:500} .top .r b.rec{color:var(--rec)}
 #stack{width:100%;height:70px;display:block;border:1px solid var(--line)}
 button:disabled{opacity:0.35}
-.recbar{display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:5;background:var(--bg);padding:4px 0} .recbar .rl{display:flex;gap:3px} .recbar .rl button{min-height:36px;padding:8px 9px;font-size:11px} .recbar #b-rec-top{min-height:40px;padding:8px 14px} .recbar .lbl{margin-left:auto;font-size:11px;color:var(--fg);white-space:nowrap;text-align:right} .recbar .lbl.rec{color:var(--rec)} .recbar .lbl.cnt{color:var(--acc);font-size:16px;font-weight:600}
+.recbar{display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:5;background:var(--bg);padding:4px 0} .recbar .rl,#grain-src .rl{display:flex;gap:3px} #grain-src .rl button{min-height:36px;padding:8px 9px;font-size:11px} .recbar .rl button{min-height:36px;padding:8px 9px;font-size:11px} .recbar #b-rec-top{min-height:40px;padding:8px 14px} .recbar .lbl{margin-left:auto;font-size:11px;color:var(--fg);white-space:nowrap;text-align:right} .recbar .lbl.rec{color:var(--rec)} .recbar .lbl.cnt{color:var(--acc);font-size:16px;font-weight:600}
 #glide.rec{border-color:var(--rec);box-shadow:0 0 0 1px var(--rec) inset}
 .pane{display:none;flex-direction:column;gap:10px}.pane.on{display:flex}
 .sets{display:flex;gap:5px} .sets button{flex:1;padding:10px 2px;min-height:40px;font-size:12px}
@@ -59,6 +59,8 @@ input[type=range]{flex:1;min-width:60px;accent-color:var(--acc);height:28px;marg
 .editor .kn{flex:1 1 46%} .editor .kn span{min-width:4.2em;font-size:10px}
 .layer{display:grid;grid-template-columns:34px 1fr 90px 44px;gap:8px;align-items:center;border:1px solid var(--line);border-radius:4px;padding:8px}
 .layer .nm{color:var(--dim)} .layer .nm b{color:var(--fg);font-weight:500} .layer button{min-height:36px;padding:8px} .layer.muted{opacity:.45}
+#recband{position:fixed;left:0;right:0;top:0;z-index:15;background:var(--rec);color:#fff;text-align:center;font-weight:600;font-size:22px;letter-spacing:.05em;padding:14px 10px;box-shadow:0 2px 14px rgba(0,0,0,.5)} #recband.cnt{font-size:34px;background:var(--acc);color:#000} #recband small{display:block;font-size:11px;font-weight:400;opacity:.85;letter-spacing:.1em}
+body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shadow:0 0 0 2px var(--rec) inset} body.rec .recbar{background:#2a0c0c}
 #wake{position:fixed;inset:0;background:rgba(10,10,11,.92);display:flex;align-items:center;justify-content:center;text-align:center;z-index:20;color:var(--fg);font-size:14px;line-height:2;cursor:pointer} #wake b{color:var(--acc);font-size:18px;letter-spacing:.2em} #wake small{display:block;color:var(--dim);font-size:10px;text-transform:none;line-height:1.6;margin-top:8px} #wake[hidden]{display:none!important}
 #toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);transform:translateX(-50%);background:var(--fg);color:var(--bg);font-size:11px;padding:8px 14px;border-radius:4px;max-width:92%;text-align:center;opacity:0;transition:opacity .25s;pointer-events:none;text-transform:none;letter-spacing:.04em;z-index:9}
 #toast.show{opacity:1}
@@ -83,6 +85,7 @@ input[type=range]{flex:1;min-width:60px;accent-color:var(--acc);height:28px;marg
   <canvas id="stack"></canvas>
 
   <section class="pane on" data-pane="make">
+    <div id="recband" hidden></div>
     <div class="recbar">
       <button id="b-rec-top" class="recbtn">● Rec</button>
       <span class="rl"><button data-rl="4">4</button><button data-rl="8" class="on">8</button><button data-rl="15">15</button><button data-rl="30">30</button><button data-rl="0">∞</button></span>
@@ -91,7 +94,7 @@ input[type=range]{flex:1;min-width:60px;accent-color:var(--acc);height:28px;marg
     <div class="sets" id="mode"><button data-mode="glide" class="on">なぞる</button><button data-mode="step">ステップ</button></div>
     <div class="chips" id="instr"></div>
     <div class="lbl" style="text-transform:none;margin:4px 0 2px">音源をダブルタップ = その音源全体の音色</div>
-    <div class="row" id="grain-src" hidden><span class="lbl">粒の素材</span><button id="b-mic">● Rec</button><button id="b-file">File</button><button id="b-fromclip">最後のクリップ</button><span id="smp-name" class="lbl" style="margin-left:auto;text-transform:none">まだ無し</span><input id="f-file" type="file" accept="audio/*" hidden></div>
+    <div class="row" id="grain-src" hidden><span class="lbl">粒の素材</span><button id="b-mic">● Rec</button><button id="b-file">File</button><button id="b-fromclip">最後のクリップ</button><span class="rl"><button data-gl="2">2</button><button data-gl="4" class="on">4</button><button data-gl="8">8</button></span><span id="smp-name" class="lbl" style="margin-left:auto;text-transform:none">まだ無し</span><input id="f-file" type="file" accept="audio/*" hidden></div>
     <canvas id="slicer" hidden></canvas>
     <div class="row" id="slicer-row" hidden><button id="sl-zoom">拡大</button><button id="sl-auto">自動で切る</button><button id="sl-even">8等分</button><span class="lbl" style="margin-left:auto;text-transform:none">タップ=選ぶ・鳴らす / 端をドラッグ=長さ / 中をドラッグ=移動</span></div>
     <div id="macro" class="editor" hidden>
@@ -585,7 +588,8 @@ const slUp=()=>{ if(slDrag&&slDrag.moved){ slPlay(slSel); const p=SETS.grain.pad
 $('#sl-zoom').onclick=e=>{ slZoom=!slZoom; e.target.classList.toggle('on',slZoom); e.target.textContent=slZoom?'全体':'拡大'; };
 $('#sl-auto').onclick=()=>{ if(!sample) return; slices=findSlices(sample); toast('音の立ち上がりで切り直しました'); };
 $('#sl-even').onclick=()=>{ if(!sample) return; const D=sample.duration; slices=Array.from({length:8},(_,i)=>({start:i/8*D,len:Math.min(2.5,D/8)})); toast('8等分にしました'); };
-function setSample(b,name){ setTimeout(()=>{ const nm=$('#smp-name'); nm.textContent=name+' · '+(slices?slices.length:8)+'粒'; nm.dataset.prev=nm.textContent; },0); sample=b; sampleRev=ac.createBuffer(b.numberOfChannels,b.length,b.sampleRate); for(let c=0;c<b.numberOfChannels;c++){ const s=b.getChannelData(c), d=sampleRev.getChannelData(c); for(let i=0,n=s.length;i<n;i++) d[i]=s[n-1-i]; } slices=findSlices(b); SETS.grain.pads.forEach((p,i)=>{ p.l='粒 '+(i+1); p.s=(slices[i]?slices[i].start.toFixed(1):'')+'s'; }); $('#smp-name').textContent=name; curSet='grain'; selected={set:'grain',idx:0}; if(mode==='glide') instr=INSTR.find(x=>x.id==='grain'); build(); }
+function normBuf(b,target){ let pk=0; for(let c=0;c<b.numberOfChannels;c++){ const d=b.getChannelData(c); for(let i=0;i<d.length;i++){ const a=Math.abs(d[i]); if(a>pk) pk=a; } } if(pk>0.0005&&Math.abs(pk-target)>0.02){ const g=target/pk; for(let c=0;c<b.numberOfChannels;c++){ const d=b.getChannelData(c); for(let i=0;i<d.length;i++) d[i]*=g; } } return b; }
+function setSample(b,name){ normBuf(b,0.7); setTimeout(()=>{ const nm=$('#smp-name'); nm.textContent=name+' · '+(slices?slices.length:8)+'粒'; nm.dataset.prev=nm.textContent; },0); sample=b; sampleRev=ac.createBuffer(b.numberOfChannels,b.length,b.sampleRate); for(let c=0;c<b.numberOfChannels;c++){ const s=b.getChannelData(c), d=sampleRev.getChannelData(c); for(let i=0,n=s.length;i<n;i++) d[i]=s[n-1-i]; } slices=findSlices(b); SETS.grain.pads.forEach((p,i)=>{ p.l='粒 '+(i+1); p.s=(slices[i]?slices[i].start.toFixed(1):'')+'s'; }); $('#smp-name').textContent=name; curSet='grain'; selected={set:'grain',idx:0}; if(mode==='glide') instr=INSTR.find(x=>x.id==='grain'); build(); }
 $('#b-file').onclick=()=>{ensureAudio();$('#f-file').click();}; $('#b-fromclip').onclick=()=>{ ensureAudio(); if(!clips.length){ toast('クリップがまだありません。Rec で録ると使えます'); return; } const c=sel||clips[clips.length-1]; setSample(c.buf,c.name); toast(c.name+' を粒の素材にしました'); }; $('#f-file').onchange=async e=>{ const f=e.target.files[0]; if(!f) return; e.target.value=''; try{ setSample(await ac.decodeAudioData(await f.arrayBuffer()),f.name.slice(0,16)); toast('粒の素材を読み込みました'); }catch(err){ toast('この形式は読み込めませんでした'); } };
 // microphone → PCM through the audio graph (no codec round-trip). onTick(sec) while recording; resolves an AudioBuffer (or null if empty).
 let micJob=null; const IOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
@@ -601,10 +605,13 @@ async function micCapture(maxSec,onTick){ ensureAudio(); if(micJob){ micJob.stop
       let pk=0; for(let k=0;k<idx;k+=37) pk=Math.max(pk,Math.abs(bufL[k])); if(idx<ac.sampleRate*0.15||pk<0.004){ toast(idx<ac.sampleRate*0.15?'録音が短すぎました':'マイクの音がほぼ無音でした(マナースイッチや他アプリを確認)'); afterMic(); res(null); return; }
       const b=ac.createBuffer(2,idx,ac.sampleRate); b.copyToChannel(bufL.subarray(0,idx),0); b.copyToChannel(bufR.subarray(0,idx),1); afterMic(); res(b); };
     micJob={stop:finish}; }); }
-$('#b-mic').onclick=async()=>{ const b=$('#b-mic'), nm=$('#smp-name'); if(micJob){ micJob.stop(); return; } b.classList.add('on'); b.textContent='■ Stop'; nm.className='lbl rec'; nm.textContent='● 0.0s';
-  const buf=await micCapture(recLen||60,sec=>{ if(sec>=0) nm.textContent='● '+sec.toFixed(1)+'s'+(recLen?' / '+recLen+'s':''); }); b.classList.remove('on'); b.textContent='● Rec'; nm.className='lbl';
+let grainLen=4; document.querySelectorAll('[data-gl]').forEach(x=>x.onclick=()=>{ grainLen=+x.dataset.gl; document.querySelectorAll('[data-gl]').forEach(y=>y.classList.toggle('on',y===x)); });
+let micCancel=null;
+$('#b-mic').onclick=async()=>{ const b=$('#b-mic'), nm=$('#smp-name'); if(micJob){ micJob.stop(); return; } if(micCancel){ micCancel(); micCancel=null; b.classList.remove('on'); b.textContent='● Rec'; return; }
+  b.classList.add('on'); b.textContent='■ Stop'; await new Promise(r=>{ micCancel=countIn(()=>{ micCancel=null; r(); },'粒の録音まで'); }); if(!b.classList.contains('on')) return;
+  nm.className='lbl rec'; nm.textContent='● 0.0s'; const buf=await micCapture(grainLen,sec=>{ if(sec>=0){ nm.textContent='● '+sec.toFixed(1)+'s / '+grainLen+'s'; bandShow('● REC '+sec.toFixed(1)+'s / '+grainLen+'s<small>粒の素材をマイクで録音中 — Stop で終了</small>'); } else bandHide(); }); b.classList.remove('on'); b.textContent='● Rec'; nm.className='lbl'; bandHide();
   if(buf){ setSample(buf,'mic '+buf.duration.toFixed(1)+'s'); toast('粒の素材に入れました('+buf.duration.toFixed(1)+'秒)'); } else nm.textContent=sample?nm.dataset.prev||'入っています':'まだ無し'; };
-$('#b-micclip').onclick=async()=>{ const b=$('#b-micclip'); if(micJob){ micJob.stop(); return; } b.classList.add('on'); b.textContent='■ Stop mic'; const st=$('#rec-status'); const buf=await micCapture(recLen||120,sec=>{ if(sec>=0){ st.textContent='● MIC '+sec.toFixed(1)+'s'; st.className='lbl rec'; } else st.className='lbl'; }); b.classList.remove('on'); b.textContent='● Mic phrase'; if(buf) addClip(buf,'マイク'); };
+$('#b-micclip').onclick=async()=>{ const b=$('#b-micclip'); if(micJob){ micJob.stop(); return; } if(micCancel){ micCancel(); micCancel=null; b.classList.remove('on'); b.textContent='● Mic phrase'; return; } b.classList.add('on'); b.textContent='■ Stop mic'; await new Promise(r=>{ micCancel=countIn(()=>{ micCancel=null; r(); },'マイク録音まで'); }); if(!b.classList.contains('on')) return; const st=$('#rec-status'); const buf=await micCapture(recLen||120,sec=>{ if(sec>=0){ st.textContent='● MIC '+sec.toFixed(1)+'s'; st.className='lbl rec'; bandShow('● MIC '+sec.toFixed(1)+'s'+(recLen?' / '+recLen+'s':'')+'<small>マイクをクリップに録音中 — もう一度押すと停止</small>'); } else { st.className='lbl'; bandHide(); } }); b.classList.remove('on'); b.textContent='● Mic phrase'; if(buf) addClip(buf,'マイク'); };
 
 /* knobs */
 function showKnobs(){ document.querySelectorAll('.knob').forEach(el=>{ const k=el.dataset.k, mn=+el.dataset.min, mx=+el.dataset.max; el.querySelector('.k').textContent=P[k]; el.style.setProperty('--rot',(-135+270*(P[k]-mn)/(mx-mn))+'deg'); }); }
@@ -616,9 +623,12 @@ let recording=false, recL=null, recR=null, recStart=0, recLen=8, recIdx=0, recMa
 function onCapture(e){ if(!recording||!recL) return; const inL=e.inputBuffer.getChannelData(0), inR=e.inputBuffer.numberOfChannels>1?e.inputBuffer.getChannelData(1):inL; const n=inL.length; let idx=Math.floor((e.playbackTime-recStart)*ac.sampleRate); if(idx<0){ const skip=-idx; idx=0; for(let i=skip;i<n;i++){ if(idx>=recMax) break; recL[idx]=inL[i]; recR[idx]=inR[i]; idx++; } } else { for(let i=0;i<n;i++){ if(idx>=recMax) break; recL[idx]=inL[i]; recR[idx]=inR[i]; idx++; } } recIdx=Math.max(recIdx,idx); if(recIdx>=recMax) rec(false); }
 document.querySelectorAll('[data-rl]').forEach(b=>b.onclick=()=>{ recLen=+b.dataset.rl; document.querySelectorAll('[data-rl]').forEach(x=>x.classList.toggle('on',+x.dataset.rl===recLen)); });
 let countTimer=null, counting=false;
-function setRecUI(on){ for(const id of ['#b-rec','#b-rec-top']){ const b=$(id); b.classList.toggle('on',on); } $('#b-rec').textContent=on?'■ Stop':'● Rec phrase'; $('#b-rec-top').textContent=on?'■ Stop':'● Rec'; $('#glide').classList.toggle('rec',on); }
-function recWithCount(){ ensureAudio(); if(recording){ rec(false); return; } if(counting){ clearTimeout(countTimer); counting=false; $('#rec-status').textContent='READY'; $('#rec-status').className='lbl'; return; }
-  counting=true; let n=3; const st=$('#rec-status'); const tick=()=>{ if(!counting) return; if(n>0){ st.textContent=String(n); st.className='lbl cnt'; noise({hp:2500,len:0.01,gain:0.25,pan:0},PP()); n--; countTimer=setTimeout(tick,600); } else { counting=false; rec(true); } }; tick(); }
+const band=$('#recband'); function bandShow(html,cnt){ band.innerHTML=html; band.className=cnt?'cnt':''; band.hidden=false; document.body.classList.toggle('rec',!cnt); } function bandHide(){ band.hidden=true; document.body.classList.remove('rec'); }
+// 3-2-1 count-in with clicks, then cb(). Press again (cancel()) to abort.
+function countIn(cb,label){ ensureAudio(); counting=true; let n=3; const tick=()=>{ if(!counting) return; if(n>0){ bandShow(String(n)+'<small>'+(label||'録音まで')+'</small>',true); noise({hp:2500,len:0.01,gain:0.3,pan:0},PP()); n--; countTimer=setTimeout(tick,600); } else { counting=false; bandHide(); cb(); } }; tick(); return ()=>{ counting=false; clearTimeout(countTimer); bandHide(); }; }
+function setRecUI(on){ if(!on) bandHide(); for(const id of ['#b-rec','#b-rec-top']){ const b=$(id); b.classList.toggle('on',on); } $('#b-rec').textContent=on?'■ Stop':'● Rec phrase'; $('#b-rec-top').textContent=on?'■ Stop':'● Rec'; $('#glide').classList.toggle('rec',on); }
+function recWithCount(){ ensureAudio(); if(recording){ rec(false); return; } if(counting){ clearTimeout(countTimer); counting=false; bandHide(); return; }
+  countIn(()=>rec(true),'フレーズ録音まで'); }
 $('#b-rec-top').onclick=recWithCount;
 let recName=null;
 function rec(on,opt){ ensureAudio(); if(on===recording) return; recording=on; setRecUI(on); opt=opt||{};
@@ -685,7 +695,7 @@ function drawTL(){ if(!document.querySelector('.pane[data-pane="tl"]').classList
   const hx=xOf(tlPos()); tg.fillStyle=fg; tg.fillRect(hx-0.5,0,1.5,TH); tg.fillStyle=acc; tg.beginPath(); tg.moveTo(hx-5,0); tg.lineTo(hx+5,0); tg.lineTo(hx,7); tg.fill();
   if(tlPlaying){ const p=tlPos(); if(p>=tlLen){ if(tlLoop){ head=0; tlPlay(false); tlPlay(true); } else { tlPlay(false); head=0; } } }
   $('#r-pos').textContent=tlPos().toFixed(1).padStart(4,'0'); }
-setInterval(()=>{ const st=$('#rec-status'); if(counting||micJob) return; if(recording&&ac){ const el=Math.max(0,ac.currentTime-recStart); st.textContent='● '+el.toFixed(1)+(recLen?'/'+recLen:'')+'s'; st.className='lbl rec'; } else { st.textContent=recLen?recLen+'s':'∞'; st.className='lbl'; } },100);
+setInterval(()=>{ const st=$('#rec-status'); if(counting||micJob||micCancel) return; if(recording&&ac){ const el=Math.max(0,ac.currentTime-recStart); st.textContent='● '+el.toFixed(1)+(recLen?'/'+recLen:'')+'s'; st.className='lbl rec'; bandShow('● REC '+el.toFixed(1)+'s'+(recLen?' / '+recLen+'s':'')+'<small>'+(recName||'フレーズを録音中 — もう一度押すと停止')+'</small>'); } else { st.textContent=recLen?recLen+'s':'∞'; st.className='lbl'; } },100);
 // pointer interaction: tap = head / select; drag clip = move; drag edge = trim
 let drag=null;
 tl.addEventListener('pointerdown',e=>{ ensureAudio(); tl.setPointerCapture(e.pointerId); const r=tl.getBoundingClientRect(); const x=e.clientX-r.left, y=e.clientY-r.top; const t=tOf(x); const lane=Math.floor((y-RULER)/LANE_H);
