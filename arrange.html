@@ -163,6 +163,7 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
   
   <section class="pane" data-pane="tl">
     <canvas id="tl"></canvas>
+    <div class="lbl" style="text-transform:none;margin:2px 0">上の帯=ワークエリア(ドラッグで範囲、タップで全体)・ 目盛り=再生位置をドラッグ ・ 2本指でズーム / 1本指でスクロール</div>
     <div class="tlbar">
       <button id="t-play" class="primary">▶ Play</button><button id="t-loop">Loop</button><button id="t-head0">|◀</button>
       <button id="t-zoomout">−</button><button id="t-zoomin">+</button><button id="t-undo" title="Undo">↶</button><button id="t-redo" title="Redo">↷</button>
@@ -210,7 +211,7 @@ const wakeEl=document.getElementById('wake'); let needRebuild=false, wentHidden=
 function unlock(){ try{ if(needRebuild){ rebuildAudio(); needRebuild=false; wakeEl.hidden=true; } ensureAudio(); if(ac.state!=='running') ac.resume(); const b=ac.createBuffer(1,1,ac.sampleRate), src=ac.createBufferSource(); src.buffer=b; src.connect(ac.destination); src.start(0); }catch(e){} }
 ['touchend','click','keydown'].forEach(ev=>document.addEventListener(ev,unlock,{passive:true}));
 setInterval(()=>{ if(ac&&ac.state!=='running'&&!needRebuild) ac.resume().catch(()=>{}); const el=document.getElementById('r-audio'); if(el) el.textContent=ac?(ac.state==='running'?'♪':'zz'):'·'; },400);
-window._arr={get ac(){return ac},get M(){return M},get clips(){return clips},get cap(){return capNode},get SETS(){return SETS},get lanes(){return lanes},get slices(){return slices},limitBuf:(b)=>limitBuf(b),addClip:(b,n)=>addClip(b,n)};
+window._arr={get ac(){return ac},get M(){return M},get clips(){return clips},get cap(){return capNode},get SETS(){return SETS},get lanes(){return lanes},get slices(){return slices},get tl(){return {zoom,scrollX,head,wa}},limitBuf:(b)=>limitBuf(b),addClip:(b,n)=>addClip(b,n)};
 
 const wakeTap=()=>{ if(needRebuild){ rebuildAudio(); needRebuild=false; } unlock(); setTimeout(()=>{ if(ac&&ac.state==='running') wakeEl.hidden=true; },150); setTimeout(()=>{ if(ac&&ac.state==='running') wakeEl.hidden=true; else { needRebuild=true; wakeEl.querySelector('div').innerHTML='<b>構成</b><br>もう一度タップ(エンジンを作り直します)'; } },800); };
 wakeEl.addEventListener('touchend',wakeTap,{passive:true}); wakeEl.addEventListener('click',wakeTap);
@@ -669,7 +670,7 @@ $('#b-rec').onclick=recWithCount;
 
 /* ---------- timeline model ---------- */
 const COLORS={'綺麗':'#e0a92a','澄':'#f2e6c8','なぞる':'#ffd27a','ノイズ':'#dcd7cb','低音':'#5aa0b0','粒':'#e5668f','軌道':'#4fae68','マイク':'#ff7a1a'};
-let clips=[], sel=null, tlLen=60, head=0, tlPlaying=false, tlLoop=false, tlStartAt=0, tlHeadAt=0, zoom=1, scrollX=0; const LANES=6, LANE_H=44, RULER=18;
+let clips=[], sel=null, tlLen=60, head=0, tlPlaying=false, tlLoop=false, tlStartAt=0, tlHeadAt=0, zoom=1, scrollX=0; const LANES=6, LANE_H=44, RULER=34, WAH=14; let wa={s:0,e:60,full:true};   // wa = work area (play / loop / mixdown range)
 function tameBuf(buf,ceil){ let pk=0; for(let c=0;c<buf.numberOfChannels;c++){ const d=buf.getChannelData(c); for(let i=0;i<d.length;i++){ const a=Math.abs(d[i]); if(a>pk) pk=a; } } if(pk>ceil){ const g=ceil/pk; for(let c=0;c<buf.numberOfChannels;c++){ const d=buf.getChannelData(c); for(let i=0;i<d.length;i++) d[i]*=g; } } return buf; }
 function addClip(buf,name){ pushUndo(); tameBuf(buf,0.42); const dur=buf.duration; let lane=0; for(lane=0;lane<LANES;lane++){ if(!clips.some(c=>c.lane===lane&&c.start<head+dur&&c.start+c.len>head)) break; } if(lane>=LANES) lane=LANES-1;
   const c={id:Date.now()+Math.random(),buf,rbuf:null,name,color:COLORS[name]||(mode==='glide'?'#ffd27a':'#dcd7cb'),start:snap(head),lane,offset:0,len:dur,gain:1,fi:0.02,fo:0.05,rep:1,reverse:false,muted:false}; clips.push(c); sel=c; if(c.start+c.len>tlLen){ tlLen=Math.ceil((c.start+c.len)/30)*30; $('#t-len').value=String(Math.min(120,tlLen)); } renderClipbar(); $('#r-n').textContent=clips.length; toast(name+' を '+c.start.toFixed(1)+'s のレーン'+(lane+1)+'に置きました'); if(tlPlaying) restartPlayback(); }
@@ -688,11 +689,12 @@ function scheduleClips(ctx,dest,from,now){ const nodes=[]; if(ctx===ac&&M) M.lay
     const foStart=now+(cs+total-fo-from); if(fo>0&&foStart>t0){ g.gain.setValueAtTime(G,foStart); g.gain.linearRampToValueAtTime(0.0001,now+(cs+total-from)); } else if(fo===0){ g.gain.setValueAtTime(0,now+(cs+total-from)); }
     nodes.push(src); } return nodes; }
 function tlPlay(on){ ensureAudio(); if(tlPlaying){ playing_nodes.forEach(n=>{try{n.stop();}catch(e){}}); playing_nodes=[]; head=tlPos(); } tlPlaying=on; $('#t-play').textContent=on?'■ Stop':'▶ Play'; $('#t-play').classList.toggle('on',on);
-  if(on){ if(head>=tlLen-0.05) head=0; tlStartAt=ac.currentTime+0.05; tlHeadAt=head; playing_nodes=scheduleClips(ac,M.master,head,tlStartAt); } }
+  if(on){ if(head<wa.s||head>=wa.e-0.05) head=wa.s; tlStartAt=ac.currentTime+0.05; tlHeadAt=head; playing_nodes=scheduleClips(ac,M.master,head,tlStartAt); } }
 function restartPlayback(){ if(!tlPlaying) return; const p=tlPos(); playing_nodes.forEach(n=>{try{n.stop();}catch(e){}}); tlStartAt=ac.currentTime+0.02; tlHeadAt=p; playing_nodes=scheduleClips(ac,M.master,p,tlStartAt); }
 function tlPos(){ return tlPlaying?tlHeadAt+Math.max(0,ac.currentTime-tlStartAt):head; }
-$('#t-play').onclick=()=>tlPlay(!tlPlaying); $('#t-loop').onclick=()=>{ tlLoop=!tlLoop; $('#t-loop').classList.toggle('on',tlLoop); }; $('#t-head0').onclick=()=>{ head=0; if(tlPlaying){ tlPlay(false); tlPlay(true); } };
-$('#t-len').onchange=e=>{ tlLen=+e.target.value; }; $('#t-zoomin').onclick=()=>{ zoom=Math.min(6,zoom*1.5); }; $('#t-zoomout').onclick=()=>{ zoom=Math.max(0.5,zoom/1.5); };
+$('#t-play').onclick=()=>tlPlay(!tlPlaying); $('#t-loop').onclick=()=>{ tlLoop=!tlLoop; $('#t-loop').classList.toggle('on',tlLoop); }; $('#t-head0').onclick=()=>{ head=wa.s; if(tlPlaying){ tlPlay(false); tlPlay(true); } };
+$('#t-len').onchange=e=>{ tlLen=+e.target.value; if(wa.full||wa.e>tlLen) wa.e=tlLen; wa.s=Math.min(wa.s,wa.e-1); }; function zoomAt(z,px){ const t=tOf(px); zoom=Math.max(0.5,Math.min(16,z)); scrollX=Math.max(0,Math.min(Math.max(0,tlLen*pxPerSec()-(TW-LH)),t*pxPerSec()-(px-LH))); }
+$('#t-zoomin').onclick=()=>zoomAt(zoom*1.5,LH+(TW-LH)/2); $('#t-zoomout').onclick=()=>zoomAt(zoom/1.5,LH+(TW-LH)/2);
 
 /* ---------- timeline canvas ---------- */
 const tl=$('#tl'), tg=tl.getContext('2d'); let TW=0,TH=0;
@@ -704,8 +706,9 @@ function drawTL(){ if(!document.querySelector('.pane[data-pane="tl"]').classList
   // lanes
   for(let l=0;l<LANES;l++){ const y=RULER+l*LANE_H; tg.fillStyle=l%2?'#0e0e0f':'#0a0a0b'; tg.fillRect(0,y,TW,LANE_H); tg.strokeStyle=line; tg.beginPath(); tg.moveTo(0,y+0.5); tg.lineTo(TW,y+0.5); tg.stroke(); }
   tg.save(); tg.beginPath(); tg.rect(LH,0,TW-LH,TH); tg.clip();
-  // ruler
-  tg.fillStyle='#111'; tg.fillRect(0,0,TW,RULER); const stepS=zoom>=3?1:zoom>=1.5?2:5; for(let t=0;t<=tlLen;t+=stepS){ const x=xOf(t); if(x<-20||x>TW+20) continue; tg.strokeStyle=t%10===0?dim:line; tg.beginPath(); tg.moveTo(x+0.5,RULER-(t%10===0?10:5)); tg.lineTo(x+0.5,TH); tg.stroke(); if(t%10===0){ tg.fillStyle=dim; tg.font='9px '+css('--mono'); tg.textAlign='left'; tg.textBaseline='top'; tg.fillText(t+'s',x+3,2); } }
+  // ruler: top band = work area bar, bottom band = time ticks
+  tg.fillStyle='#111'; tg.fillRect(0,0,TW,RULER); tg.fillStyle='#0c0c0d'; tg.fillRect(0,0,TW,WAH); const stepS=zoom>=6?0.5:zoom>=3?1:zoom>=1.5?2:5, lab=zoom>=6?2:zoom>=3?5:10; for(let t=0;t<=tlLen+1e-6;t+=stepS){ const x=xOf(t); if(x<-20||x>TW+20) continue; const big=Math.abs(t/lab-Math.round(t/lab))<1e-6; tg.strokeStyle=big?dim:line; tg.beginPath(); tg.moveTo(x+0.5,RULER-(big?10:5)); tg.lineTo(x+0.5,TH); tg.stroke(); if(big){ tg.fillStyle=dim; tg.font='9px '+css('--mono'); tg.textAlign='left'; tg.textBaseline='top'; tg.fillText(t+'s',x+3,WAH+2); } }
+  { const x0=xOf(wa.s), x1=xOf(wa.e); tg.fillStyle=acc; tg.globalAlpha=0.28; tg.fillRect(x0,2,x1-x0,WAH-4); tg.globalAlpha=1; tg.fillRect(x0,1,4,WAH-2); tg.fillRect(x1-4,1,4,WAH-2); tg.fillStyle=fg; tg.font='9px '+css('--mono'); tg.textAlign='left'; tg.textBaseline='middle'; if(x1-x0>70) tg.fillText((wa.e-wa.s).toFixed(1)+'s',x0+8,WAH/2); }
   // clips
   for(const c of clips){ const x=xOf(c.start), w=Math.max(6,c.len*pxPerSec()), y=RULER+c.lane*LANE_H+4, h=LANE_H-8; if(x>TW||x+w<0) continue;
     const off=c.muted||!laneOn(c.lane); tg.globalAlpha=off?0.35:1; tg.fillStyle=c===sel?'#1f1a14':'#151414'; tg.strokeStyle=c===sel?acc:c.color; tg.lineWidth=c===sel?1.5:1; tg.beginPath(); tg.roundRect?tg.roundRect(x+0.5,y+0.5,w-1,h-1,3):tg.rect(x+0.5,y+0.5,w-1,h-1); tg.fill(); tg.stroke();
@@ -720,23 +723,33 @@ function drawTL(){ if(!document.querySelector('.pane[data-pane="tl"]').classList
   tg.fillStyle='#111'; tg.fillRect(0,0,LH,RULER);
   // playhead (follow it when zoomed in)
   if(tlPlaying&&!drag){ const px=xOf(tlPos()); if(px>TW-30||px<LH) scrollX=Math.max(0,Math.min(tlLen*pxPerSec()-(TW-LH),tlPos()*pxPerSec()-30)); }
-  const hx=xOf(tlPos()); tg.fillStyle=fg; tg.fillRect(hx-0.5,0,1.5,TH); tg.fillStyle=acc; tg.beginPath(); tg.moveTo(hx-5,0); tg.lineTo(hx+5,0); tg.lineTo(hx,7); tg.fill();
-  if(tlPlaying){ const p=tlPos(); if(p>=tlLen){ if(tlLoop){ head=0; tlPlay(false); tlPlay(true); } else { tlPlay(false); head=0; } } }
+  const hx=xOf(tlPos()); tg.fillStyle=fg; tg.fillRect(hx-0.5,0,1.5,TH); tg.fillStyle=acc; tg.beginPath(); tg.moveTo(hx-6,WAH); tg.lineTo(hx+6,WAH); tg.lineTo(hx,WAH+9); tg.fill();
+  if(tlPlaying){ const p=tlPos(); if(p>=wa.e){ if(tlLoop){ head=wa.s; tlPlay(false); tlPlay(true); } else { tlPlay(false); head=wa.s; } } }
   $('#r-pos').textContent=tlPos().toFixed(1).padStart(4,'0'); }
 setInterval(()=>{ const st=$('#rec-status'); if(counting||micJob||micCancel) return; if(recording&&ac){ const el=Math.max(0,ac.currentTime-recStart); st.textContent='● '+el.toFixed(1)+(recLen?'/'+recLen:'')+'s'; st.className='lbl rec'; bandShow('● REC '+el.toFixed(1)+'s'+(recLen?' / '+recLen+'s':'')+'<small>'+(recName||'フレーズを録音中 — もう一度押すと停止')+'</small>'); } else { st.textContent=recLen?recLen+'s':'∞'; st.className='lbl'; } },100);
 // pointer interaction: tap = head / select; drag clip = move; drag edge = trim
 let drag=null;
-tl.addEventListener('pointerdown',e=>{ ensureAudio(); tl.setPointerCapture(e.pointerId); const r=tl.getBoundingClientRect(); const x=e.clientX-r.left, y=e.clientY-r.top; const t=tOf(x); const lane=Math.floor((y-RULER)/LANE_H);
+tl.addEventListener('wheel',e=>{ e.preventDefault(); const r=tl.getBoundingClientRect(); if(e.ctrlKey||e.metaKey) zoomAt(zoom*Math.pow(1.0015,-e.deltaY),e.clientX-r.left); else scrollX=Math.max(0,Math.min(Math.max(0,tlLen*pxPerSec()-(TW-LH)),scrollX+(Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY))); },{passive:false});
+const tlPtrs=new Map(); let pinch=null;
+tl.addEventListener('pointerdown',e=>{ ensureAudio(); tl.setPointerCapture(e.pointerId); const r=tl.getBoundingClientRect(); const x=e.clientX-r.left, y=e.clientY-r.top; tlPtrs.set(e.pointerId,{x,y});
+  if(tlPtrs.size===2){ const [a,b]=[...tlPtrs.values()]; const mid=(a.x+b.x)/2; pinch={d0:Math.max(20,Math.hypot(a.x-b.x,a.y-b.y)),z0:zoom,tMid:tOf(mid)}; if(drag&&drag.c&&drag.moved){ const c=drag.c; c.start=drag.start0; c.len=drag.len0; c.offset=drag.off0; c.lane=drag.lane0; } drag=null; return; }
+  const t=tOf(x); const lane=Math.floor((y-RULER)/LANE_H);
+  if(y<RULER&&x>=LH){ if(y<WAH){ const x0=xOf(wa.s), x1=xOf(wa.e); if(!wa.full&&Math.abs(x-x0)<16) drag={wa:'L',x0:x,s0:wa.s,e0:wa.e,moved:false}; else if(!wa.full&&Math.abs(x-x1)<16) drag={wa:'R',x0:x,s0:wa.s,e0:wa.e,moved:false}; else if(!wa.full&&x>x0&&x<x1) drag={wa:'M',x0:x,s0:wa.s,e0:wa.e,moved:false}; else drag={wa:'N',x0:x,s0:snap(t),e0:snap(t),moved:false}; } else { drag={scrub:true,moved:false}; head=Math.max(0,Math.min(tlLen,snap(t))); } return; }
   if(x<LH){ if(lane>=0&&lane<LANES){ pushUndo(); if(x<LH*0.5+2) lanes[lane].mute=!lanes[lane].mute; else lanes[lane].solo=!lanes[lane].solo; restartPlayback(); } drag=null; return; }
   const hit=[...clips].reverse().find(c=>c.lane===lane&&t>=c.start&&t<=c.start+c.len); if(hit){ sel=hit; renderClipbar(); const cx=xOf(hit.start), cw=hit.len*pxPerSec(); const edge=(x-cx<14)?'L':(cx+cw-x<14)?'R':'M'; drag={c:hit,edge,x0:x,y0:y,start0:hit.start,len0:hit.len,off0:hit.offset,lane0:hit.lane,moved:false,snap:snapshot()}; }
-  else { head=Math.max(0,Math.min(tlLen,snap(t))); if(tlPlaying){ tlPlay(false); tlPlay(true); } sel=null; renderClipbar(); drag={pan:true,x0:x,s0:scrollX,moved:false}; } });
-tl.addEventListener('pointermove',e=>{ if(!drag) return; const r=tl.getBoundingClientRect(); const x=e.clientX-r.left, y=e.clientY-r.top; const dx=x-drag.x0; if(Math.abs(dx)>5||Math.abs(y-drag.y0)>5) drag.moved=true; if(!drag.moved) return;
-  if(drag.pan){ if(zoom>1) scrollX=Math.max(0,Math.min(tlLen*pxPerSec()-(TW-LH),drag.s0-dx)); return; }
+  else { drag={pan:true,x0:x,y0:y,s0:scrollX,t,moved:false}; } });
+tl.addEventListener('pointermove',e=>{ const r=tl.getBoundingClientRect(); const x=e.clientX-r.left, y=e.clientY-r.top; if(tlPtrs.has(e.pointerId)) tlPtrs.set(e.pointerId,{x,y});
+  if(pinch&&tlPtrs.size>=2){ const [a,b]=[...tlPtrs.values()]; const d=Math.max(20,Math.hypot(a.x-b.x,a.y-b.y)), mid=(a.x+b.x)/2; zoom=Math.max(0.5,Math.min(16,pinch.z0*d/pinch.d0)); scrollX=Math.max(0,Math.min(Math.max(0,tlLen*pxPerSec()-(TW-LH)),pinch.tMid*pxPerSec()-(mid-LH))); return; }
+  if(!drag) return;
+  if(drag.scrub){ head=Math.max(0,Math.min(tlLen,snap(tOf(x)))); drag.moved=true; return; }
+  if(drag.wa){ const dt=(x-drag.x0)/pxPerSec(); if(Math.abs(x-drag.x0)<4&&!drag.moved) return; drag.moved=true; wa.full=false; const mn=0.5; if(drag.wa==='L') wa.s=Math.max(0,Math.min(drag.e0-mn,snap(drag.s0+dt))); else if(drag.wa==='R') wa.e=Math.min(tlLen,Math.max(drag.s0+mn,snap(drag.e0+dt))); else if(drag.wa==='M'){ const len=drag.e0-drag.s0; wa.s=Math.max(0,Math.min(tlLen-len,snap(drag.s0+dt))); wa.e=wa.s+len; } else { const t2=snap(Math.max(0,Math.min(tlLen,tOf(x)))); wa.s=Math.min(drag.s0,t2); wa.e=Math.max(drag.s0,t2); if(wa.e-wa.s<mn) wa.e=Math.min(tlLen,wa.s+mn); } return; }
+  const dx=x-drag.x0; if(Math.abs(dx)>5||Math.abs(y-drag.y0)>5) drag.moved=true; if(!drag.moved) return;
+  if(drag.pan){ scrollX=Math.max(0,Math.min(Math.max(0,tlLen*pxPerSec()-(TW-LH)),drag.s0-dx)); return; }
   const c=drag.c, dt=dx/pxPerSec();
   if(drag.edge==='M'){ c.start=Math.max(0,snap(drag.start0+dt)); const ln=Math.floor((y-RULER)/LANE_H); if(ln>=0&&ln<LANES) c.lane=ln; }
   else if(drag.edge==='R'){ c.len=Math.max(0.1,Math.min(drag.len0+dt,(c.buf.duration-c.offset)*c.rep)); }
   else { const ns=Math.max(0,Math.min(drag.start0+drag.len0-0.1,drag.start0+dt)); const d2=ns-drag.start0; c.start=ns; c.len=drag.len0-d2; c.offset=Math.max(0,Math.min(c.buf.duration-0.1,drag.off0+d2)); } });
-const tlUp=()=>{ if(drag&&drag.c&&drag.moved){ hist.push(drag.snap); if(hist.length>60) hist.shift(); redoS.length=0; updUndo(); if(tlPlaying) restartPlayback(); } drag=null; }; tl.addEventListener('pointerup',tlUp); tl.addEventListener('pointercancel',tlUp);
+const tlUp=e=>{ if(e&&tlPtrs.has(e.pointerId)) tlPtrs.delete(e.pointerId); if(tlPtrs.size<2) pinch=null; if(drag&&drag.pan){ if(!drag.moved){ head=Math.max(0,Math.min(tlLen,snap(drag.t))); if(tlPlaying){ tlPlay(false); tlPlay(true); } sel=null; renderClipbar(); } drag=null; return; } if(drag&&(drag.scrub||drag.wa)){ if(drag.wa&&!drag.moved){ wa.s=0; wa.e=tlLen; wa.full=true; toast('ワークエリアを全体に戻しました'); } if(tlPlaying){ tlPlay(false); tlPlay(true); } drag=null; return; } if(drag&&drag.c&&drag.moved){ hist.push(drag.snap); if(hist.length>60) hist.shift(); redoS.length=0; updUndo(); if(tlPlaying) restartPlayback(); } drag=null; }; tl.addEventListener('pointerup',tlUp); tl.addEventListener('pointercancel',tlUp);
 // undo / redo: snapshots of the clip list and lane states
 const hist=[], redoS=[]; function snapshot(){ return {clips:clips.map(c=>({...c})),lanes:lanes.map(l=>({...l}))}; }
 function pushUndo(){ hist.push(snapshot()); if(hist.length>60) hist.shift(); redoS.length=0; updUndo(); }
@@ -762,9 +775,9 @@ requestAnimationFrame(frame);
 let dl=null; (async()=>{ try{ dl=await (window.claude?.use?.('downloads')); }catch(e){} })();
 async function save(blob,name){ if(dl){ try{ await dl.save({filename:name,data:blob}); toast('Saved'); }catch(e){ if(e&&e.code!=='declined') toast('保存できませんでした'); } } else { const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); toast('Saved'); } }
 function wav(buf){ const n=buf.length, ch=2, sr=buf.sampleRate, out=new DataView(new ArrayBuffer(44+n*ch*2)); const w=(o,s)=>{for(let i=0;i<s.length;i++)out.setUint8(o+i,s.charCodeAt(i));}; w(0,'RIFF'); out.setUint32(4,36+n*ch*2,true); w(8,'WAVE'); w(12,'fmt '); out.setUint32(16,16,true); out.setUint16(20,1,true); out.setUint16(22,ch,true); out.setUint32(24,sr,true); out.setUint32(28,sr*ch*2,true); out.setUint16(32,ch*2,true); out.setUint16(34,16,true); w(36,'data'); out.setUint32(40,n*ch*2,true); const L0=buf.getChannelData(0), R0=buf.numberOfChannels>1?buf.getChannelData(1):L0; let o=44; for(let i=0;i<n;i++){ out.setInt16(o,Math.max(-1,Math.min(1,L0[i]))*32767,true); out.setInt16(o+2,Math.max(-1,Math.min(1,R0[i]))*32767,true); o+=4; } return new Blob([out],{type:'audio/wav'}); }
-$('#x-mix').onclick=async()=>{ ensureAudio(); if(!clips.length){ toast('クリップがありません'); return; } const end=Math.min(tlLen,Math.max(...clips.map(c=>c.start+c.len))+1); const off=new OfflineAudioContext(2,Math.ceil(end*ac.sampleRate),ac.sampleRate); const comp=off.createDynamicsCompressor(); comp.threshold.value=-10; comp.ratio.value=3; comp.connect(off.destination);
+$('#x-mix').onclick=async()=>{ ensureAudio(); if(!clips.length){ toast('クリップがありません'); return; } const from=wa.s, end=Math.min(wa.e,Math.max(...clips.map(c=>c.start+c.len))+1)-from; if(end<=0){ toast('ワークエリアにクリップがありません'); return; } const off=new OfflineAudioContext(2,Math.ceil(end*ac.sampleRate),ac.sampleRate); const comp=off.createDynamicsCompressor(); comp.threshold.value=-10; comp.ratio.value=3; comp.connect(off.destination);
   // offline contexts need their own buffers for reversed clips: clipBuf caches on the live context, which works since AudioBuffers are context-independent
-  const trim=off.createGain(); trim.gain.value=laneTrim(); trim.connect(comp); scheduleClips(off,trim,0,0); $('#x-status').textContent='RENDER'; const mix0=await off.startRendering(); const mix=limitBuf(mix0); $('#x-status').textContent='';
+  const trim=off.createGain(); trim.gain.value=laneTrim(); trim.connect(comp); scheduleClips(off,trim,from,0); $('#x-status').textContent='RENDER'; const mix0=await off.startRendering(); const mix=limitBuf(mix0); $('#x-status').textContent='';
   if(!dl){ save(wav(mix),'arrange-mix.wav'); return; } if(!window.MediaRecorder){ toast('この環境では書き出せません'); return; }
   const dest=ac.createMediaStreamDestination(), src=ac.createBufferSource(); src.buffer=mix; src.connect(dest); const mime=['audio/mp4','audio/webm;codecs=opus','audio/webm'].find(m=>MediaRecorder.isTypeSupported(m))||''; const r=new MediaRecorder(dest.stream,mime?{mimeType:mime}:undefined), ch=[]; r.ondataavailable=e=>{if(e.data.size)ch.push(e.data);};
   let left=Math.ceil(end); $('#x-status').textContent='MIX '+left; const iv=setInterval(()=>{left--;$('#x-status').textContent='MIX '+left;},1000); r.onstop=()=>{ clearInterval(iv); $('#x-status').textContent=''; save(new Blob(ch,{type:r.mimeType||mime}),'arrange-mix.'+((r.mimeType||mime).includes('mp4')?'mp4':'webm')); }; r.start(); src.start(); setTimeout(()=>{ r.stop(); try{src.stop();}catch(e){} },end*1000+200); };
