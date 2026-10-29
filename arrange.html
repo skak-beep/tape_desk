@@ -180,6 +180,10 @@ let lastTouchEnd=0; document.addEventListener('touchend',e=>{ const n=Date.now()
 document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
 
 const $=s=>document.querySelector(s), css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+/* iOS unlock: wake the audio engine on the first touchend/click (pointerdown alone does not count on Safari) and keep nudging it while suspended */
+function unlock(){ try{ ensureAudio(); if(ac.state!=='running') ac.resume(); const b=ac.createBuffer(1,1,ac.sampleRate), src=ac.createBufferSource(); src.buffer=b; src.connect(ac.destination); src.start(0); }catch(e){} }
+['touchend','click','keydown'].forEach(ev=>document.addEventListener(ev,unlock,{passive:true}));
+setInterval(()=>{ if(ac&&ac.state!=='running') ac.resume(); },800);
 let toastT; const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600);};
 document.querySelectorAll('.tabs span').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tabs span').forEach(x=>x.classList.toggle('on',x===t));document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===t.dataset.tab));});
 const KEYS=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; let key=0; const hz=m=>440*Math.pow(2,(m-69)/12), root=()=>48+key;
