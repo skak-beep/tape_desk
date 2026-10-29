@@ -651,7 +651,10 @@ document.querySelectorAll('.knob').forEach(el=>{ const k=el.dataset.k, mn=+el.da
 
 /* ---------- phrase capture (linear, sample-accurate) ---------- */
 let recording=false, recL=null, recR=null, recStart=0, recLen=8, recIdx=0, recMax=0;
-function onCapture(e){ if(!recording||!recL) return; const inL=e.inputBuffer.getChannelData(0), inR=e.inputBuffer.numberOfChannels>1?e.inputBuffer.getChannelData(1):inL; const n=inL.length; let idx=Math.floor((e.playbackTime-recStart)*ac.sampleRate); if(idx<0){ const skip=-idx; idx=0; for(let i=skip;i<n;i++){ if(idx>=recMax) break; recL[idx]=inL[i]; recR[idx]=inR[i]; idx++; } } else { for(let i=0;i<n;i++){ if(idx>=recMax) break; recL[idx]=inL[i]; recR[idx]=inR[i]; idx++; } } recIdx=Math.max(recIdx,idx); if(recIdx>=recMax) rec(false); }
+function onCapture(e){ if(!recording||!recL) return; const inL=e.inputBuffer.getChannelData(0), inR=e.inputBuffer.numberOfChannels>1?e.inputBuffer.getChannelData(1):inL; const n=inL.length;
+  // the first block is aligned to recStart from its timestamp; after that blocks are appended back to back (timestamp rounding used to leave 1-sample holes → a 47 Hz buzz on iOS)
+  let idx, from=0; if(!recGo){ const off=Math.floor((e.playbackTime-recStart)*ac.sampleRate); if(off+n<=0) return; if(off<0){ from=-off; idx=0; } else idx=Math.min(off,recMax); recGo=true; } else idx=recIdx;
+  for(let i=from;i<n;i++){ if(idx>=recMax) break; recL[idx]=inL[i]; recR[idx]=inR[i]; idx++; } recIdx=idx; if(recIdx>=recMax) rec(false); }
 document.querySelectorAll('[data-rl]').forEach(b=>b.onclick=()=>{ recLen=+b.dataset.rl; document.querySelectorAll('[data-rl]').forEach(x=>x.classList.toggle('on',+x.dataset.rl===recLen)); });
 let countTimer=null, counting=false;
 const band=$('#recband'); function bandShow(html,cnt){ band.innerHTML=html; band.className=cnt?'cnt':''; band.hidden=false; document.body.classList.toggle('rec',!cnt); } function bandHide(){ band.hidden=true; document.body.classList.remove('rec'); }
@@ -663,9 +666,9 @@ function recWithCount(){ ensureAudio(); if(recording){ rec(false); return; } if(
   cntTL=tlPlaying?{loop:tlLoop}:null; if(tlPlaying) tlPlay(false); countIn(()=>{ const w=cntTL; cntTL=null; rec(true,{withTL:!!w,loop:w&&w.loop}); },'フレーズ録音まで'); }
 $('#b-rec-top').onclick=recWithCount;
 
-let recName=null, recWithTL=false, recResume=false;
+let recName=null, recWithTL=false, recResume=false, recGo=false;
 function rec(on,opt){ ensureAudio(); if(on===recording) return; if(on&&typeof slAutoSet==='function'&&slAuto) slAutoSet(false); recording=on; setRecUI(on); opt=opt||{};
-  if(on){ const len=opt.len||recLen; recMax=Math.floor((len||120)*ac.sampleRate); recL=new Float32Array(recMax); recR=new Float32Array(recMax); recIdx=0; recStart=opt.start||ac.currentTime+0.05; recName=opt.name||null; capOn(true); recWithTL=tlPlaying||!!opt.withTL; recResume=recWithTL&&(opt.withTL?!!opt.loop:tlLoop); if(recWithTL){ if(tlPlaying) tlPlay(false); head=wa.s; tlPlay(true,recStart); } if(opt.len) return; toast(recLen?recLen+'秒 録音中':'録音中(■で止める)'); return; }
+  if(on){ const len=opt.len||recLen; recMax=Math.floor((len||120)*ac.sampleRate); recL=new Float32Array(recMax); recR=new Float32Array(recMax); recIdx=0; recGo=false; recStart=opt.start||ac.currentTime+0.05; recName=opt.name||null; capOn(true); recWithTL=tlPlaying||!!opt.withTL; recResume=recWithTL&&(opt.withTL?!!opt.loop:tlLoop); if(recWithTL){ if(tlPlaying) tlPlay(false); head=wa.s; tlPlay(true,recStart); } if(opt.len) return; toast(recLen?recLen+'秒 録音中':'録音中(■で止める)'); return; }
   capOn(false); if(recWithTL){ recWithTL=false; if(tlPlaying) tlPlay(false); head=wa.s; }
   const resume=recResume; recResume=false; setTimeout(()=>{ if(resume&&!tlPlaying&&!recording){ head=wa.s; tlPlay(true); } },0);
   if(recL){ const n=Math.max(1,recIdx); let peak=0; for(let i=0;i<n;i+=53) peak=Math.max(peak,Math.abs(recL[i]),Math.abs(recR[i])); if(peak<0.003||n<ac.sampleRate*0.2){ toast('何も鳴らなかったので、フレーズは作りませんでした'); recL=recR=null; return; }
