@@ -24,7 +24,14 @@ button:disabled{opacity:0.35}
 body[data-mode=glide]{--mc:#ff7a5a} body[data-mode=step]{--mc:#45a6ff}
 .cap{font-size:10px;color:var(--dim);letter-spacing:.14em;text-transform:uppercase;min-width:3.2em} .grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px 8px;border:1px solid var(--line);border-radius:10px;background:var(--bg-2)} .grp button{min-height:38px;padding:8px 11px;font-size:11px;background:transparent}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--bg-2)} .seg button{border:0;border-radius:0;min-height:38px;padding:8px 12px;font-size:11px;color:var(--dim);background:transparent} .seg button+button{border-left:1px solid var(--line)} .seg button.on{background:var(--bg-3);color:var(--fg);font-weight:600;box-shadow:inset 0 -2px 0 var(--mc)}
-.between{justify-content:space-between} .eye{vertical-align:-3px;margin-right:4px}
+.between{justify-content:space-between}
+#glide{border-radius:10px 10px 0 0!important;border-bottom-color:transparent!important}
+#glide-row{margin-top:-10px} #glide-row>*+*{margin-top:10px}
+.gtabs{display:grid;grid-template-columns:max(54px,20%) 1fr;gap:0}
+.gtabs .seg{display:flex;border-radius:0;border-top:0;background:var(--bg)} .gtabs .seg button{flex:1;min-height:40px;font-size:12px;background:var(--bg);color:var(--dim);border-top:1px solid var(--line)}
+.gtabs #seg-strip{border-radius:0 0 0 10px;border-right:0} .gtabs #seg-view{border-radius:0 0 10px 0}
+.gtabs .seg button.on{background:var(--bg-2);color:var(--fg);font-weight:600;border-top-color:transparent;box-shadow:inset 0 -2px 0 var(--mc)}
+.gtabs #seg-strip button{padding:8px 0;font-size:10px;letter-spacing:0;white-space:nowrap;min-width:0} .eye{vertical-align:-3px;margin-right:4px}
 .grp button.on{background:var(--mc);border-color:var(--mc);color:#0a0a14}
 /* grid: 8 rows, each = name | rate | 16 steps */
 .grid{display:flex;flex-direction:column;gap:3px}
@@ -160,7 +167,7 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
     </div>
     <canvas id="glide" hidden></canvas>
     <div id="glide-row" hidden>
-      <div class="row between" style="margin-top:4px">
+      <div class="gtabs">
         <div class="seg" id="seg-strip"><button data-strip="fx" class="on">FX</button><button data-strip="bend">ベンド</button></div>
         <div class="seg" id="seg-view"><button data-view="grid" class="on">グリッド</button><button data-view="kbd">鍵盤</button></div>
       </div>
