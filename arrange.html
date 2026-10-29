@@ -102,7 +102,7 @@ input[type=range]{flex:1;min-width:60px;accent-color:var(--acc);height:28px;marg
     <div class="row" id="arena-row" hidden><span class="lbl">Balls</span><button id="a-bm">−</button><button id="a-balls">4</button><button id="a-bp">+</button><button id="a-shape">Oct</button><button id="a-grav">Grav 60</button><button id="a-kick">Kick</button></div>
     <div class="lbl" id="arena-help" hidden style="text-transform:none">▶ Run で玉が動き、壁に当たると鳴ります。壁の音=下の8行。行を選んで Edit → Source で、どのセットのどの音を壁にするか選べます。</div>
     <div class="row">
-      <button id="b-run" class="primary">▶ Run</button><button id="b-latch" class="on">Latch</button><button id="b-edit">Edit</button><button id="b-clrpat">Clear row</button>
+      <button id="b-run" class="primary">▶ Run</button><button id="b-latch" class="on">Latch</button><button id="b-edit">Edit</button><button id="b-clrpat">Clear row</button><button id="b-clrall">全消去</button>
       <span id="sel-name" class="lbl" style="margin-left:auto"></span>
     </div>
     <div id="editor" class="editor" hidden>
@@ -329,6 +329,7 @@ function findSlices(b){ const d=b.getChannelData(0), sr=b.sampleRate, hop=Math.f
 function grain(idx,v,pn,pp,at){ pp=pp||PP(); if(!sample){ toast('出力タブ「粒の素材」で録音かファイルを入れてください'); return; } const t=at||ac.currentTime, sl=slices[idx]||{start:idx/8*sample.duration,len:0.5}, rate=Math.pow(2,pp.pitch/12), len=Math.min(sl.len,0.1+pp.decay*1.2), buf=pp.reverse?sampleRev:sample, pos=pp.reverse?Math.max(0,sample.duration-(sl.start+len)):sl.start;
   const src=ac.createBufferSource(); src.buffer=buf; src.playbackRate.value=rate; const g=ac.createGain(); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.9*(0.5+v*0.5)*pp.level,t+0.004); g.gain.setValueAtTime(0.9*(0.5+v*0.5)*pp.level,t+Math.max(0.005,len/rate-0.03)); g.gain.linearRampToValueAtTime(0,t+len/rate); const f=ac.createBiquadFilter(); f.type='lowpass'; f.frequency.value=1500+pp.tone*9000;
   const out=gate(t,len/rate,{...pp,reverse:false},pn); src.connect(f).connect(g).connect(out); revSend(g,0.4*pp.rev); src.start(t,pos,len+0.05); }
+function wood(f0,v,pn,pp,at){ pp=pp||PP(); const t=at||ac.currentTime, o=ac.createOscillator(), gg=ac.createGain(); f0*=Math.pow(2,pp.pitch/12); o.type='triangle'; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f0*0.55,t+0.03); gg.gain.setValueAtTime((0.25+v*0.3)*pp.level,t); gg.gain.exponentialRampToValueAtTime(0.0001,t+(0.03+v*0.03)*pp.decay); o.connect(gg).connect(gate(t,0.12,pp,pn)); revSend(gg,0.3*pp.rev); o.start(t); o.stop(t+0.15); }
 function chirp(v,pn,pp,at){ pp=pp||PP(); const t=at||ac.currentTime, o=ac.createOscillator(), g=ac.createGain(); o.type='sine'; const f0=(1300+v*1400)*Math.pow(2,pp.pitch/12), len=(0.15+v*0.25)*pp.decay; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f0*(1.6+pp.tone*1.6),t+len); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.15*pp.level,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+len); o.connect(g).connect(gate(t,len,pp,pn)); revSend(g,1.2*pp.rev); o.start(t); o.stop(t+len+0.05); }
 
 /* ---------- sets: 8 sounds each; each sound has params (p), a 16-step pattern (pat), and a speed (mult) ---------- */
@@ -339,12 +340,12 @@ const SETS={
   noise:{name:'ノイズ',pads:[
     mk('ツ','tick',(v,pn,pp,at)=>noise({hp:3000,len:0.004,gain:0.4*v+0.1,pan:pn},pp,at)),
     mk('ツッ','click',(v,pn,pp,at)=>noise({hp:1800,len:0.012,gain:0.5*v+0.1,pan:pn,rev:0.2},pp,at)),
+    mk('ツツツ','3連',(v,pn,pp,at)=>{ const t0=at||ac.currentTime; for(let k=0;k<3;k++) noise({hp:2500,len:0.006,gain:(0.5*v+0.1)*Math.pow(0.85,k),pan:pn,rev:0.15},pp,t0+k*0.045); }),
     mk('プツッ','pop',(v,pn,pp,at)=>{noise({bp:300+v*300,q:1.5,len:0.012,gain:0.8*v+0.1,pan:pn},pp,at);noise({hp:2000,len:0.004,gain:0.25,pan:pn},pp,at);}),
-    mk('ザッ','burst',(v,pn,pp,at)=>noise({bp:1500,q:0.7,len:0.06+v*0.08,gain:0.3*v+0.08,pan:pn,rev:0.3},pp,at)),
-    mk('ザー','hold',(v,pn,pp,at)=>noise({bp:900+v*600,q:0.6,len:1,gain:0.18*v+0.05,pan:pn,rev:0.4,fadeIn:0.05,hold:true},pp,at)),
-    mk('ザザー','hold',(v,pn,pp,at)=>noise({bp:1200,q:0.8,len:1,gain:0.22*v+0.05,am:12+v*25,pan:pn,rev:0.4,fadeIn:0.03,hold:true},pp,at)),
-    mk('ツー','hold',(v,pn,pp,at)=>noise({bp:2500+v*2000,q:14,len:1,gain:0.35*v+0.1,pan:pn,rev:0.6,fadeIn:0.08,hold:true},pp,at)),
-    mk('ピチー','chirp',chirp)]},
+    mk('コツ','wood',(v,pn,pp,at)=>wood(170+v*300,v,pn,pp,at)),
+    mk('コロ','wood low',(v,pn,pp,at)=>wood(110+v*120,v,pn,pp,at)),
+    mk('チリ','dust',(v,pn,pp,at)=>{ const t0=at||ac.currentTime; for(let k=0;k<3;k++) noise({hp:5000,len:0.002,gain:0.18*(0.5+v),pan:pn+(Math.random()-0.5)*0.4},pp,t0+k*(0.006+Math.random()*0.02)); }),
+    mk('スッ','breath',(v,pn,pp,at)=>{ const t0=at||ac.currentTime; noise({hp:2600,len:0.05,gain:0.1*(0.5+v),pan:pn,fadeIn:0.03},pp,t0); noise({hp:1800,len:0.008,gain:0.35*v+0.1,pan:pn},pp,t0+0.05); })]},
   low:{name:'低音',pads:[
     mk('脈 45','thump',(v,pn,pp,at)=>thump(42,v,pn,pp,at)),mk('脈 60','thump',(v,pn,pp,at)=>thump(58,v,pn,pp,at)),
     mk('ベース','root',(v,pn,pp,at)=>bassPluck(0,v,pn,pp,at)),mk('ベース 5','5th',(v,pn,pp,at)=>bassPluck(7,v,pn,pp,at)),
@@ -387,6 +388,7 @@ $('#ed-rev').onclick=()=>{ const p=selPad(); p.p.reverse=!p.p.reverse; $('#ed-re
 $('#ed-close').onclick=()=>{ $('#editor').hidden=true; }; $('#ed-reset').onclick=()=>{ const p=selPad(); const keep={clean:p.p.clean,voice:p.p.voice}; p.p=Object.assign(PP(),keep); openEditor(p); };
 $('#b-edit').onclick=()=>{ editMode=!editMode; $('#b-edit').classList.toggle('on',editMode); if(editMode) openEditor(selPad()); else $('#editor').hidden=true; };
 $('#b-clrpat').onclick=()=>{ const p=selPad(); p.pat.fill(0); renderGrid(); toast(p.l+' の行を消しました'); };
+$('#b-clrall').onclick=()=>{ for(const st of Object.values(SETS)) st.pads.forEach(p=>p.pat.fill(0)); if(seq.on) runSeq(false); renderGrid(); toast('全セットのステップを消しました'); };
 
 /* ---------- sequencer: every row runs at its own speed ---------- */
 const seq={on:false,timer:null};
@@ -463,7 +465,7 @@ function glNote(c,r,v,quick,drag){ const m=instr.mac, pn=(c-(GC-1)/2)/(GC-1)*1.4
   switch(r){ case 0: noise({hp:1200+u*5000,len:0.003+u*0.004,gain:g*0.5,pan:pn},pp); break;
     case 1: { const n=2+Math.round(u*5), iv=0.028+(1-u)*0.03; for(let k=0;k<n;k++) noise({hp:2000+u*3000,len:0.006,gain:g*0.6*Math.pow(0.85,k),pan:pn,rev:0.15},pp,ac.currentTime+k*iv); break; }
     case 2: noise({bp:180+u*700,q:1.5,len:0.012+u*0.01,gain:g*0.9,pan:pn},pp); noise({hp:2000,len:0.004,gain:0.25,pan:pn},pp); break;
-    case 3: { const o=ac.createOscillator(), gg=ac.createGain(), t=ac.currentTime, f0=400+u*1400; o.type='triangle'; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f0*0.55,t+0.03); gg.gain.setValueAtTime(g*0.3*pp.level,t); gg.gain.exponentialRampToValueAtTime(0.0001,t+0.03+u*0.03); o.connect(gg).connect(gate(t,0.1,pp,pn)); revSend(gg,0.3*pp.rev); o.start(t); o.stop(t+0.1); break; }   // コツ: small wooden tick
+    case 3: wood(170+u*380,v,pn,pp); break;   // コツ: small wooden tick
     case 4: { for(let k=0;k<2+Math.round(u*3);k++) noise({hp:4000+u*3000,len:0.002,gain:g*0.18,pan:pn+(Math.random()-0.5)*0.4},pp,ac.currentTime+k*(0.006+Math.random()*0.02)); break; }   // チリ: a few dust grains
     case 5: { let k=0, dt=0; const n=4+Math.floor(Math.random()*6); const acc=Math.random()<0.5; for(k=0;k<n;k++){ const r2=[0,0,1,2,3,4][Math.floor(Math.random()*6)]; const cc=Math.floor(Math.random()*GC); setTimeout(()=>glNote(cc,r2,0.5+Math.random()*0.4,true),dt); dt+=acc?30+k*k*8:160-k*14; } break; } } }
 function glSwell(c,r,v){ const m=instr.mac, pn=(c-(GC-1)/2)/(GC-1)*1.4*m.spread, u=c/(GC-1);
