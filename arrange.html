@@ -90,6 +90,7 @@ input[type=range]{flex:1;min-width:60px;accent-color:var(--acc);height:28px;marg
     <div class="sets" id="mode"><button data-mode="glide" class="on">なぞる</button><button data-mode="step">ステップ</button></div>
     <div class="chips" id="instr"></div>
     <div class="lbl" style="text-transform:none;margin:4px 0 2px">音源をダブルタップ = その音源全体の音色</div>
+    <div class="row" id="grain-src" hidden><span class="lbl">粒の素材</span><button id="b-mic">● Rec</button><button id="b-file">File</button><button id="b-fromclip">最後のクリップ</button><span id="smp-name" class="lbl" style="margin-left:auto;text-transform:none">まだ無し</span><input id="f-file" type="file" accept="audio/*" hidden></div>
     <div id="macro" class="editor" hidden>
       <div class="hd"><span id="mac-name">—</span><span><button id="mac-reset">Reset</button><button id="mac-close">Close</button></span></div>
       <div class="row">
@@ -168,7 +169,6 @@ input[type=range]{flex:1;min-width:60px;accent-color:var(--acc);height:28px;marg
     <div class="row"><span class="lbl">Mixdown</span><button id="x-mix" class="primary">Save audio</button><button id="x-json">AE markers (JSON)</button><span id="x-status" class="lbl" style="margin-left:auto"></span></div>
     <div class="row"><span class="lbl">Preset</span><button data-pre="video" class="on">動画</button><button data-pre="fog">霧</button><button data-pre="glass">硝子</button></div>
     <div class="row"><span class="lbl">Key</span><button id="b-key">C minor</button><label class="kn"><span>Swing</span><input id="k-swing" type="range" min="0" max="1" step="0.01" value="0.3"></label></div>
-    <div class="row"><span class="lbl">粒の素材</span><button id="b-mic">● Rec</button><button id="b-file">File</button><span id="smp-name" class="lbl" style="margin-left:auto">synthetic</span><input id="f-file" type="file" hidden></div>
     <div class="lbl" style="text-transform:none">Mixdown はタイムライン全体を正確に書き出します。AE markers は各クリップの開始/終了秒を JSON で出します(After Effects のマーカーや式に使えます)。</div>
   </section>
   <div class="foot"><span>MAKE <b>PHRASE</b> · ARRANGE <b>CLIPS</b></span><span id="dsp">DSP 00%</span></div>
@@ -524,7 +524,7 @@ const instrEl=$('#instr'); INSTR.forEach(it=>{ const b=document.createElement('b
 let macTarget=INSTR[0]; function openMacro(it){ macTarget=it; $('#macro').hidden=false; $('#mac-name').textContent=it.name+' — 全体の音色'; document.querySelectorAll('[data-mac]').forEach(r=>r.value=it.mac[r.dataset.mac]); $('#b-mac').classList.add('on'); }
 $('#mac-close').onclick=()=>{ $('#macro').hidden=true; $('#b-mac').classList.remove('on'); };
 document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{ mode=b.dataset.mode; build(); });
-function renderInstr(){ const cur=mode==='glide'?instr.id:curSet; instrEl.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.i===cur)); if(!$('#macro').hidden&&macTarget!==instr&&mode==='glide') openMacro(instr); $('#gl-scale').hidden=instr.kind!=='p'; $('#gl-kbd').hidden=instr.kind!=='p'; }
+function renderInstr(){ const cur=mode==='glide'?instr.id:curSet; $('#grain-src').hidden=cur!=='grain'; instrEl.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.i===cur)); if(!$('#macro').hidden&&macTarget!==instr&&mode==='glide') openMacro(instr); $('#gl-scale').hidden=instr.kind!=='p'; $('#gl-kbd').hidden=instr.kind!=='p'; }
 document.querySelectorAll('[data-mac]').forEach(r=>r.oninput=()=>{ macTarget.mac[r.dataset.mac]=+r.value; if(r.dataset.mac==='drive'&&macTarget===instr) applyDrive(); });
 $('#b-mac').onclick=()=>{ if($('#macro').hidden||macTarget!==instr) openMacro(instr); else $('#mac-close').onclick(); };
 $('#mac-reset').onclick=()=>{ macTarget.mac=Object.assign(MAC(),macTarget.m||{}); if(macTarget===instr) applyDrive(); openMacro(macTarget); };
@@ -561,7 +561,7 @@ document.querySelectorAll('[data-pre]').forEach(b=>b.onclick=()=>{ document.quer
 document.querySelectorAll('[data-len]').forEach(b=>b.onclick=()=>{ if(layers.length){ toast('レイヤーがあるので長さは変えられません(Clear all で可)'); return; } loopLen=+b.dataset.len; document.querySelectorAll('[data-len]').forEach(x=>x.classList.toggle('on',x===b)); $('#r-len').textContent=loopLen; if(playing) play(true); });
 $('#b-key').onclick=()=>{ key=(key+[5,7,2,10,3][Math.floor(Math.random()*5)])%12; $('#b-key').textContent=KEYS[key]+' minor'; build(); };
 function setSample(b,name){ sample=b; sampleRev=ac.createBuffer(b.numberOfChannels,b.length,b.sampleRate); for(let c=0;c<b.numberOfChannels;c++){ const s=b.getChannelData(c), d=sampleRev.getChannelData(c); for(let i=0,n=s.length;i<n;i++) d[i]=s[n-1-i]; } slices=findSlices(b); SETS.grain.pads.forEach((p,i)=>{ p.l='粒 '+(i+1); p.s=(slices[i]?slices[i].start.toFixed(1):'')+'s'; }); $('#smp-name').textContent=name; curSet='grain'; selected={set:'grain',idx:0}; build(); }
-$('#b-file').onclick=()=>{ensureAudio();$('#f-file').click();}; $('#f-file').onchange=async e=>{ const f=e.target.files[0]; if(!f) return; e.target.value=''; try{ setSample(await ac.decodeAudioData(await f.arrayBuffer()),f.name.slice(0,16)); toast('粒の素材を読み込みました'); }catch(err){ toast('この形式は読み込めませんでした'); } };
+$('#b-file').onclick=()=>{ensureAudio();$('#f-file').click();}; $('#b-fromclip').onclick=()=>{ ensureAudio(); if(!clips.length){ toast('クリップがまだありません。Rec で録ると使えます'); return; } const c=sel||clips[clips.length-1]; setSample(c.buf,c.name); toast(c.name+' を粒の素材にしました'); }; $('#f-file').onchange=async e=>{ const f=e.target.files[0]; if(!f) return; e.target.value=''; try{ setSample(await ac.decodeAudioData(await f.arrayBuffer()),f.name.slice(0,16)); toast('粒の素材を読み込みました'); }catch(err){ toast('この形式は読み込めませんでした'); } };
 let mrec=null, chunks=[]; $('#b-mic').onclick=async()=>{ ensureAudio(); if(mrec){ mrec.stop(); return; } if(!navigator.mediaDevices?.getUserMedia){ toast('マイクが使えない環境です'); return; }
   try{ const st=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}}); chunks=[]; mrec=new MediaRecorder(st); mrec.ondataavailable=ev=>{if(ev.data.size)chunks.push(ev.data);};
     mrec.onstop=async()=>{ st.getTracks().forEach(x=>x.stop()); const blob=new Blob(chunks,{type:mrec.mimeType}); mrec=null; $('#b-mic').classList.remove('on'); $('#b-mic').textContent='● Rec'; try{ setSample(await ac.decodeAudioData(await blob.arrayBuffer()),'mic'); toast('録音 → 粒'); }catch(e){ toast('録音を読み込めませんでした'); } };
