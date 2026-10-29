@@ -91,7 +91,7 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
   <canvas id="stack"></canvas>
   <section id="tl-sec" class="pane" hidden>
     <canvas id="tl"></canvas>
-    <div class="lbl" style="text-transform:none;margin:2px 0">上の帯=ワークエリア(ドラッグで範囲、タップで全体)・ 目盛り=再生位置をドラッグ ・ 2本指でズーム / 1本指でスクロール</div>
+    <div class="lbl" style="text-transform:none;margin:2px 0">上の帯=ワークエリア(素材の長さに自動で合う。ドラッグで手動、タップで自動に戻す)・ 目盛り=再生位置をドラッグ ・ 2本指でズーム / 1本指でスクロール</div>
     <div class="tlbar">
       <button id="t-undo">↶ 戻す</button><button id="t-redo">↷ やり直す</button>
       <select id="t-snap" aria-label="snap"><option value="0">Snap off</option><option value="0.5" selected>Snap 0.5s</option><option value="1">Snap 1s</option><option value="2">Snap 2s</option></select>
@@ -671,10 +671,11 @@ function capOn(on){ if(!ac) return; if(capNode){ capNode.port.postMessage({on});
 
 /* ---------- timeline model ---------- */
 const COLORS={'綺麗':'#e0a92a','澄':'#f2e6c8','なぞる':'#ffd27a','ノイズ':'#dcd7cb','低音':'#5aa0b0','粒':'#e5668f','軌道':'#4fae68','マイク':'#ff7a1a'};
-let clips=[], sel=null, tlLen=60, head=0, tlPlaying=false, tlLoop=false, tlStartAt=0, tlHeadAt=0, zoom=1, scrollX=0; const LANES=6, LANE_H=44, RULER=34, WAH=14; let wa={s:0,e:60,full:true};   // wa = work area (play / loop / mixdown range)
+let clips=[], sel=null, tlLen=60, head=0, tlPlaying=false, tlLoop=false, tlStartAt=0, tlHeadAt=0, zoom=1, scrollX=0; const LANES=6, LANE_H=44, RULER=34, WAH=14; let wa={s:0,e:60,full:true};   // full = automatic: the end follows the last clip (Premiere-style) until the bar is dragged by hand
+function fitWA(){ if(!wa.full) return; const ends=clips.map(c=>c.start+c.len); wa.s=0; wa.e=ends.length?Math.max(1,Math.min(tlLen,Math.ceil(Math.max(...ends)*2)/2)):tlLen; }   // wa = work area (play / loop / mixdown range)
 function tameBuf(buf,ceil){ let pk=0; for(let c=0;c<buf.numberOfChannels;c++){ const d=buf.getChannelData(c); for(let i=0;i<d.length;i++){ const a=Math.abs(d[i]); if(a>pk) pk=a; } } if(pk>ceil){ const g=ceil/pk; for(let c=0;c<buf.numberOfChannels;c++){ const d=buf.getChannelData(c); for(let i=0;i<d.length;i++) d[i]*=g; } } return buf; }
 function addClip(buf,name){ pushUndo(); tameBuf(buf,0.42); const dur=buf.duration; let lane=0; for(lane=0;lane<LANES;lane++){ if(!clips.some(c=>c.lane===lane&&c.start<head+dur&&c.start+c.len>head)) break; } if(lane>=LANES) lane=LANES-1;
-  const c={id:Date.now()+Math.random(),buf,rbuf:null,name,color:COLORS[name]||(mode==='glide'?'#ffd27a':'#dcd7cb'),start:snap(head),lane,offset:0,len:dur,gain:1,fi:0.02,fo:0.05,rep:1,reverse:false,muted:false}; clips.push(c); sel=c; if(c.start+c.len>tlLen){ tlLen=Math.ceil((c.start+c.len)/30)*30; $('#t-len').value=String(Math.min(120,tlLen)); } renderClipbar(); $('#r-n').textContent=clips.length; toast(name+' を '+c.start.toFixed(1)+'s のレーン'+(lane+1)+'に置きました'); if(tlPlaying) restartPlayback(); }
+  const c={id:Date.now()+Math.random(),buf,rbuf:null,name,color:COLORS[name]||(mode==='glide'?'#ffd27a':'#dcd7cb'),start:snap(head),lane,offset:0,len:dur,gain:1,fi:0.02,fo:0.05,rep:1,reverse:false,muted:false}; clips.push(c); sel=c; if(c.start+c.len>tlLen){ tlLen=Math.ceil((c.start+c.len)/30)*30; $('#t-len').value=String(Math.min(120,tlLen)); } fitWA(); renderClipbar(); $('#r-n').textContent=clips.length; toast(name+' を '+c.start.toFixed(1)+'s のレーン'+(lane+1)+'に置きました'); if(tlPlaying) restartPlayback(); }
 const snap=v=>{ const s=+$('#t-snap').value; return s?Math.round(v/s)*s:v; };
 function clipBuf(c){ if(!c.reverse) return c.buf; if(!c.rbuf){ const b=c.buf; c.rbuf=ac.createBuffer(b.numberOfChannels,b.length,b.sampleRate); for(let ch=0;ch<b.numberOfChannels;ch++){ const s=b.getChannelData(ch), d=c.rbuf.getChannelData(ch); for(let i=0,n=s.length;i<n;i++) d[i]=s[n-1-i]; } } return c.rbuf; }
 
@@ -694,7 +695,7 @@ function tlPlay(on,at){ ensureAudio(); if(tlPlaying){ playing_nodes.forEach(n=>{
 function restartPlayback(){ if(!tlPlaying) return; const p=tlPos(); playing_nodes.forEach(n=>{try{n.stop();}catch(e){}}); tlStartAt=ac.currentTime+0.02; tlHeadAt=p; playing_nodes=scheduleClips(ac,M.master,p,tlStartAt); }
 function tlPos(){ return tlPlaying?tlHeadAt+Math.max(0,ac.currentTime-tlStartAt):head; }
 $('#t-play').onclick=()=>tlPlay(!tlPlaying); $('#t-loop').onclick=()=>{ tlLoop=!tlLoop; $('#t-loop').classList.toggle('on',tlLoop); }; $('#t-head0').onclick=()=>{ if(tlPlaying){ tlPlay(false); head=wa.s; tlPlay(true); } else head=wa.s; };
-$('#t-len').onchange=e=>{ tlLen=+e.target.value; if(wa.full||wa.e>tlLen) wa.e=tlLen; wa.s=Math.min(wa.s,wa.e-1); }; function zoomAt(z,px){ const t=tOf(px); zoom=Math.max(0.5,Math.min(16,z)); scrollX=Math.max(0,Math.min(Math.max(0,tlLen*pxPerSec()-(TW-LH)),t*pxPerSec()-(px-LH))); }
+$('#t-len').onchange=e=>{ tlLen=+e.target.value; if(wa.e>tlLen) wa.e=tlLen; wa.s=Math.min(wa.s,wa.e-1); fitWA(); }; function zoomAt(z,px){ const t=tOf(px); zoom=Math.max(0.5,Math.min(16,z)); scrollX=Math.max(0,Math.min(Math.max(0,tlLen*pxPerSec()-(TW-LH)),t*pxPerSec()-(px-LH))); }
 
 
 /* ---------- timeline canvas ---------- */
@@ -709,7 +710,7 @@ function drawTL(){ if(tlSec.hidden) return; if(!TW) tlResize(); tg.clearRect(0,0
   tg.save(); tg.beginPath(); tg.rect(LH,0,TW-LH,TH); tg.clip();
   // ruler: top band = work area bar, bottom band = time ticks
   tg.fillStyle='#111'; tg.fillRect(0,0,TW,RULER); tg.fillStyle='#0c0c0d'; tg.fillRect(0,0,TW,WAH); const stepS=zoom>=6?0.5:zoom>=3?1:zoom>=1.5?2:5, lab=zoom>=6?2:zoom>=3?5:10; for(let t=0;t<=tlLen+1e-6;t+=stepS){ const x=xOf(t); if(x<-20||x>TW+20) continue; const big=Math.abs(t/lab-Math.round(t/lab))<1e-6; tg.strokeStyle=big?dim:line; tg.beginPath(); tg.moveTo(x+0.5,RULER-(big?10:5)); tg.lineTo(x+0.5,TH); tg.stroke(); if(big){ tg.fillStyle=dim; tg.font='9px '+css('--mono'); tg.textAlign='left'; tg.textBaseline='top'; tg.fillText(t+'s',x+3,WAH+2); } }
-  { const x0=xOf(wa.s), x1=xOf(wa.e); tg.fillStyle=acc; tg.globalAlpha=0.28; tg.fillRect(x0,2,x1-x0,WAH-4); tg.globalAlpha=1; tg.fillRect(x0,1,4,WAH-2); tg.fillRect(x1-4,1,4,WAH-2); tg.fillStyle=fg; tg.font='9px '+css('--mono'); tg.textAlign='left'; tg.textBaseline='middle'; if(x1-x0>70) tg.fillText((wa.e-wa.s).toFixed(1)+'s',x0+8,WAH/2); }
+  { const x0=xOf(wa.s), x1=xOf(wa.e); tg.fillStyle=acc; tg.globalAlpha=0.28; tg.fillRect(x0,2,x1-x0,WAH-4); tg.globalAlpha=1; tg.fillRect(x0,1,4,WAH-2); tg.fillRect(x1-4,1,4,WAH-2); tg.fillStyle=fg; tg.font='9px '+css('--mono'); tg.textAlign='left'; tg.textBaseline='middle'; if(x1-x0>70) tg.fillText((wa.e-wa.s).toFixed(1)+'s'+(wa.full?' auto':''),x0+8,WAH/2); }
   // clips
   for(const c of clips){ const x=xOf(c.start), w=Math.max(6,c.len*pxPerSec()), y=RULER+c.lane*LANE_H+4, h=LANE_H-8; if(x>TW||x+w<0) continue;
     const off=c.muted||!laneOn(c.lane); tg.globalAlpha=off?0.35:1; tg.fillStyle=c===sel?'#1f1a14':'#151414'; tg.strokeStyle=c===sel?acc:c.color; tg.lineWidth=c===sel?1.5:1; tg.beginPath(); tg.roundRect?tg.roundRect(x+0.5,y+0.5,w-1,h-1,3):tg.rect(x+0.5,y+0.5,w-1,h-1); tg.fill(); tg.stroke();
@@ -751,11 +752,11 @@ tl.addEventListener('pointermove',e=>{ const r=tl.getBoundingClientRect(); const
   if(drag.edge==='M'){ c.start=Math.max(0,snap(drag.start0+dt)); const ln=Math.floor((y-RULER)/LANE_H); if(ln>=0&&ln<LANES) c.lane=ln; }
   else if(drag.edge==='R'){ c.len=Math.max(0.1,Math.min(drag.len0+dt,(c.buf.duration-c.offset)*c.rep)); }
   else { const ns=Math.max(0,Math.min(drag.start0+drag.len0-0.1,drag.start0+dt)); const d2=ns-drag.start0; c.start=ns; c.len=drag.len0-d2; c.offset=Math.max(0,Math.min(c.buf.duration-0.1,drag.off0+d2)); } });
-const tlUp=e=>{ if(e&&tlPtrs.has(e.pointerId)) tlPtrs.delete(e.pointerId); if(tlPtrs.size<2) pinch=null; if(drag&&drag.pan){ if(!drag.moved){ head=Math.max(0,Math.min(tlLen,snap(drag.t))); if(tlPlaying){ tlPlay(false); tlPlay(true); } sel=null; renderClipbar(); } drag=null; return; } if(drag&&(drag.scrub||drag.wa)){ if(drag.wa&&!drag.moved){ wa.s=0; wa.e=tlLen; wa.full=true; toast('ワークエリアを全体に戻しました'); } if(tlPlaying){ tlPlay(false); tlPlay(true); } drag=null; return; } if(drag&&drag.c&&drag.moved){ hist.push(drag.snap); if(hist.length>60) hist.shift(); redoS.length=0; updUndo(); if(tlPlaying) restartPlayback(); } drag=null; }; tl.addEventListener('pointerup',tlUp); tl.addEventListener('pointercancel',tlUp);
+const tlUp=e=>{ if(e&&tlPtrs.has(e.pointerId)) tlPtrs.delete(e.pointerId); if(tlPtrs.size<2) pinch=null; if(drag&&drag.pan){ if(!drag.moved){ head=Math.max(0,Math.min(tlLen,snap(drag.t))); if(tlPlaying){ tlPlay(false); tlPlay(true); } sel=null; renderClipbar(); } drag=null; return; } if(drag&&(drag.scrub||drag.wa)){ if(drag.wa&&!drag.moved){ wa.full=true; fitWA(); toast('ワークエリアを素材の長さに合わせました(自動)'); } if(tlPlaying){ tlPlay(false); tlPlay(true); } drag=null; return; } if(drag&&drag.c&&drag.moved){ hist.push(drag.snap); if(hist.length>60) hist.shift(); redoS.length=0; updUndo(); fitWA(); if(tlPlaying) restartPlayback(); } drag=null; }; tl.addEventListener('pointerup',tlUp); tl.addEventListener('pointercancel',tlUp);
 // undo / redo: snapshots of the clip list and lane states
 const hist=[], redoS=[]; function snapshot(){ return {clips:clips.map(c=>({...c})),lanes:lanes.map(l=>({...l}))}; }
 function pushUndo(){ hist.push(snapshot()); if(hist.length>60) hist.shift(); redoS.length=0; updUndo(); }
-function restore(sn){ clips=sn.clips.map(c=>({...c})); lanes=sn.lanes.map(l=>({...l})); sel=null; $('#r-n').textContent=clips.length; restartPlayback(); renderClipbar(); updUndo(); }
+function restore(sn){ clips=sn.clips.map(c=>({...c})); lanes=sn.lanes.map(l=>({...l})); sel=null; fitWA(); $('#r-n').textContent=clips.length; restartPlayback(); renderClipbar(); updUndo(); }
 function undo(){ if(!hist.length) return; redoS.push(snapshot()); restore(hist.pop()); toast('戻しました'); } function redo(){ if(!redoS.length) return; hist.push(snapshot()); restore(redoS.pop()); toast('やり直しました'); }
 function updUndo(){ $('#t-undo').disabled=!hist.length; $('#t-redo').disabled=!redoS.length; }
 $('#t-undo').onclick=undo; $('#t-redo').onclick=redo; updUndo();
@@ -763,10 +764,10 @@ document.addEventListener('keydown',e=>{ if(e.target.matches('input,select,texta
 let slideSnap=null; document.querySelectorAll('#clipbar input[type=range]').forEach(r=>{ r.addEventListener('pointerdown',()=>{ slideSnap=snapshot(); }); r.addEventListener('change',()=>{ if(slideSnap){ hist.push(slideSnap); if(hist.length>60) hist.shift(); redoS.length=0; updUndo(); slideSnap=null; } }); });
 function renderClipbar(){ const cb=$('#clipbar'); if(!sel){ cb.hidden=true; return; } cb.hidden=false; $('#cb-name').textContent=sel.name+' · '+sel.start.toFixed(1)+'s · '+sel.len.toFixed(1)+'s'; $('#cb-gain').value=sel.gain; $('#cb-fi').value=sel.fi; $('#cb-fo').value=sel.fo; $('#cb-rep').value=sel.rep; $('#cb-rev').classList.toggle('on',sel.reverse); $('#cb-mute').classList.toggle('on',sel.muted); }
 $('#cb-gain').oninput=e=>{ if(sel){ sel.gain=+e.target.value; restartPlayback(); } }; $('#cb-fi').oninput=e=>{ if(sel){ sel.fi=+e.target.value; restartPlayback(); } }; $('#cb-fo').oninput=e=>{ if(sel){ sel.fo=+e.target.value; restartPlayback(); } };
-$('#cb-rep').oninput=e=>{ if(sel){ sel.rep=+e.target.value; sel.len=Math.min(sel.buf.duration-sel.offset,sel.len)*1; sel.len=Math.max(sel.len,0.1); if(sel.rep>1) sel.len=(sel.buf.duration-sel.offset)*sel.rep; restartPlayback(); renderClipbar(); } };
+$('#cb-rep').oninput=e=>{ if(sel){ sel.rep=+e.target.value; sel.len=Math.min(sel.buf.duration-sel.offset,sel.len)*1; sel.len=Math.max(sel.len,0.1); if(sel.rep>1) sel.len=(sel.buf.duration-sel.offset)*sel.rep; fitWA(); restartPlayback(); renderClipbar(); } };
 $('#cb-rev').onclick=()=>{ if(sel){ pushUndo(); sel.reverse=!sel.reverse; restartPlayback(); renderClipbar(); } }; $('#cb-mute').onclick=()=>{ if(sel){ pushUndo(); sel.muted=!sel.muted; restartPlayback(); renderClipbar(); } };
-$('#cb-dup').onclick=()=>{ if(!sel) return; pushUndo(); const c={...sel,id:Date.now()+Math.random(),start:sel.start+sel.len}; clips.push(c); sel=c; $('#r-n').textContent=clips.length; restartPlayback(); renderClipbar(); };
-$('#cb-del').onclick=()=>{ if(!sel) return; pushUndo(); clips=clips.filter(c=>c!==sel); sel=null; $('#r-n').textContent=clips.length; restartPlayback(); renderClipbar(); }; $('#cb-close').onclick=()=>{ sel=null; renderClipbar(); };
+$('#cb-dup').onclick=()=>{ if(!sel) return; pushUndo(); const c={...sel,id:Date.now()+Math.random(),start:sel.start+sel.len}; clips.push(c); sel=c; fitWA(); $('#r-n').textContent=clips.length; restartPlayback(); renderClipbar(); };
+$('#cb-del').onclick=()=>{ if(!sel) return; pushUndo(); clips=clips.filter(c=>c!==sel); sel=null; fitWA(); $('#r-n').textContent=clips.length; restartPlayback(); renderClipbar(); }; $('#cb-close').onclick=()=>{ sel=null; renderClipbar(); };
 
 /* ---------- stack view (top): small overview of the timeline ---------- */
 const cv=$('#stack'), g=cv.getContext('2d'); let W=0,H=0; function resize(){ const r=cv.getBoundingClientRect(); const d=Math.min(2,devicePixelRatio||1); W=r.width;H=r.height; cv.width=W*d; cv.height=H*d; g.setTransform(d,0,0,d,0,0); } new ResizeObserver(resize).observe(cv); resize();
