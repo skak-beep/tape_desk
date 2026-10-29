@@ -89,26 +89,28 @@ input[type=range]{flex:1;min-width:60px;accent-color:var(--acc);height:28px;marg
     </div>
     <div class="sets" id="mode"><button data-mode="glide" class="on">なぞる</button><button data-mode="step">ステップ</button></div>
     <div class="chips" id="instr"></div>
+    <div class="lbl" style="text-transform:none;margin:4px 0 2px">音源をダブルタップ = その音源全体の音色</div>
+    <div id="macro" class="editor" hidden>
+      <div class="hd"><span id="mac-name">—</span><span><button id="mac-reset">Reset</button><button id="mac-close">Close</button></span></div>
+      <div class="row">
+        <label class="kn"><span>Attack</span><input data-mac="att" type="range" min="0" max="1" step="0.01"></label>
+        <label class="kn"><span>Decay</span><input data-mac="dec" type="range" min="0" max="1" step="0.01"></label>
+        <label class="kn"><span>Bright</span><input data-mac="bright" type="range" min="0" max="1" step="0.01"></label>
+        <label class="kn"><span>Wobble</span><input data-mac="wob" type="range" min="0" max="1" step="0.01"></label>
+        <label class="kn"><span>Drive</span><input data-mac="drive" type="range" min="0" max="1" step="0.01"></label>
+        <label class="kn"><span>Reverb</span><input data-mac="rev" type="range" min="0" max="1" step="0.01"></label>
+        <label class="kn"><span>Octave</span><input data-mac="oct" type="range" min="-2" max="2" step="1"></label>
+        <label class="kn"><span>Spread</span><input data-mac="spread" type="range" min="0" max="1" step="0.01"></label>
+      </div>
+    </div>
     <canvas id="glide" hidden></canvas>
     <div id="glide-row" hidden>
       <div class="row" style="margin-top:6px"><button id="gl-scale">ペンタ</button><button id="gl-kbd">鍵盤</button><button id="gl-chord">和音</button><button id="gl-rand">乱</button><button id="gl-seed">種</button><button id="b-mac">音色</button><span class="lbl" style="margin-left:auto;text-transform:none">なぞる=連打 · 止める=続く · 乱=触れた所でランダム(↕高さ ↔速さ)· 種=性格を変える · 右の帯=2本目の指</span></div>
-      <div id="macro" class="editor" hidden>
-        <div class="hd"><span id="mac-name">—</span><span><button id="mac-reset">Reset</button></span></div>
-        <div class="row">
-          <label class="kn"><span>Attack</span><input data-mac="att" type="range" min="0" max="1" step="0.01"></label>
-          <label class="kn"><span>Decay</span><input data-mac="dec" type="range" min="0" max="1" step="0.01"></label>
-          <label class="kn"><span>Bright</span><input data-mac="bright" type="range" min="0" max="1" step="0.01"></label>
-          <label class="kn"><span>Wobble</span><input data-mac="wob" type="range" min="0" max="1" step="0.01"></label>
-          <label class="kn"><span>Drive</span><input data-mac="drive" type="range" min="0" max="1" step="0.01"></label>
-          <label class="kn"><span>Reverb</span><input data-mac="rev" type="range" min="0" max="1" step="0.01"></label>
-          <label class="kn"><span>Octave</span><input data-mac="oct" type="range" min="-2" max="2" step="1"></label>
-          <label class="kn"><span>Spread</span><input data-mac="spread" type="range" min="0" max="1" step="0.01"></label>
-        </div>
-      </div>
     </div>
     <div class="grid" id="grid"></div>
+    <div class="lbl" id="step-hint" style="text-transform:none;margin:2px 0">行の名前をダブルタップ = その音だけ調整 ・ 長押し = 鳴らす ・ ◉ = 消音 ・ S = ソロ</div>
     <div class="row" id="step-row">
-      <button id="b-run" class="primary">▶ Run</button><button id="b-latch" class="on">Latch</button><button id="b-edit">Edit</button><button id="b-clrpat">Clear row</button><button id="b-clrall">全消去</button><button id="b-seq2clip" class="recbtn">● 小節→クリップ</button><select id="seq-bars" aria-label="bars"><option value="1">1小節</option><option value="2" selected>2小節</option><option value="4">4小節</option><option value="8">8小節</option></select>
+      <button id="b-run" class="primary">▶ Run</button><button id="b-latch" class="on">Latch</button><button id="b-clrpat">Clear row</button><button id="b-clrall">全消去</button><button id="b-seq2clip" class="recbtn">● 小節→クリップ</button><select id="seq-bars" aria-label="bars"><option value="1">1小節</option><option value="2" selected>2小節</option><option value="4">4小節</option><option value="8">8小節</option></select>
       <span id="sel-name" class="lbl" style="margin-left:auto"></span>
     </div>
     <div id="editor" class="editor" hidden>
@@ -393,13 +395,14 @@ function padsFor(it){ if(it.kind==='p') return PENTA.slice(0,8).map(semi=>mk(KEY
 const SETS={}; INSTR.forEach(it=>{ SETS[it.id]={name:it.name,pads:padsFor(it)}; });
 let selected={set:'drums',idx:0}, editMode=false, latch=true; let mode='glide'; const selPad=()=>SETS[selected.set].pads[selected.idx];
 const gridEl=$('#grid'), padsEl=$('#pads'); const heldCells=new Set();
+const dbl=(el,fn)=>{ let t=0; el.addEventListener('pointerdown',e=>{ const n=performance.now(); if(n-t<380){ t=0; fn(e); } else t=n; }); };
 const MULTS=[0.25,0.5,1,2,4], multLabel=m=>m===0.25?'¼':m===0.5?'½':'×'+m;
 function build(){ document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('on',b.dataset.mode===mode)); INSTR.forEach(it=>{ if(it.kind==='p') SETS[it.id].pads.forEach((p,i)=>p.l=KEYS[(key+PENTA[i])%12]); });
-  const isGlide=mode==='glide'; $('#glide').hidden=!isGlide; $('#glide-row').hidden=!isGlide; gridEl.hidden=isGlide; $('#step-row').hidden=isGlide; padsEl.hidden=isGlide; if(isGlide){ $('#editor').hidden=true; requestAnimationFrame(glResize); } else if(editMode) openEditor(selPad()); renderInstr();
+  const isGlide=mode==='glide'; $('#glide').hidden=!isGlide; $('#glide-row').hidden=!isGlide; gridEl.hidden=isGlide; $('#step-row').hidden=isGlide; $('#step-hint').hidden=isGlide; padsEl.hidden=isGlide; if(isGlide){ $('#editor').hidden=true; requestAnimationFrame(glResize); } else if(editMode) openEditor(selPad()); renderInstr();
   gridEl.innerHTML=''; padsEl.innerHTML='';
   SETS[curSet].pads.forEach((p,i)=>{
     const rw=document.createElement('div'); rw.className='rw'; rw.innerHTML=`<div class="ms"><button class="m ${p.mute?'off':''}">◉</button><button class="s ${p.solo?'on':''}">S</button></div><div class="nm">${p.l}</div><div class="rt">${multLabel(p.mult)}</div><div class="cells">${Array.from({length:16},(_,k)=>`<div class="c ${k%4===0?'b4':''}" data-k="${k}"></div>`).join('')}</div>`;
-    const nm=rw.querySelector('.nm'); nm.addEventListener('pointerdown',e=>{ ensureAudio(); selected={set:curSet,idx:i}; const stop=p.f(p.p.vel,(i%4-1.5)/1.5*0.5,p.p); nm.classList.add('lit'); heldNames.set(e.pointerId,{stop,nm}); nm.setPointerCapture(e.pointerId); if(editMode) openEditor(p); updateSel(); });
+    const nm=rw.querySelector('.nm'); dbl(nm,()=>{ selected={set:curSet,idx:i}; openEditor(p); updateSel(); $('#editor').scrollIntoView({block:'nearest',behavior:'smooth'}); }); nm.addEventListener('pointerdown',e=>{ ensureAudio(); selected={set:curSet,idx:i}; const stop=p.f(p.p.vel,(i%4-1.5)/1.5*0.5,p.p); nm.classList.add('lit'); heldNames.set(e.pointerId,{stop,nm}); nm.setPointerCapture(e.pointerId); if(editMode) openEditor(p); updateSel(); });
     const nmUp=e=>{ const h=heldNames.get(e.pointerId); if(!h) return; h.stop&&h.stop(); h.nm.classList.remove('lit'); heldNames.delete(e.pointerId); }; nm.addEventListener('pointerup',nmUp); nm.addEventListener('pointercancel',nmUp);
     rw.querySelector('.rt').onclick=()=>{ p.mult=MULTS[(MULTS.indexOf(p.mult)+1)%MULTS.length]; const rt=rw.querySelector('.rt'); rt.textContent=multLabel(p.mult); rt.classList.toggle('x',p.mult!==1); p.step=0; p.next=0; };
     rw.querySelector('.rt').classList.toggle('x',p.mult!==1);
@@ -407,20 +410,20 @@ function build(){ document.querySelectorAll('#mode button').forEach(b=>b.classLi
     rw.querySelectorAll('.c').forEach(c=>{ const k=+c.dataset.k; c.addEventListener('pointerdown',e=>{ ensureAudio(); c.setPointerCapture(e.pointerId); selected={set:curSet,idx:i}; heldCells.add(i+':'+k); if(latch) p.pat[k]^=1; if(!seq.on) trig(p,p.p.vel,0,ac.currentTime); updateSel(); });
       const up=()=>{ heldCells.delete(i+':'+k); renderGrid(); }; c.addEventListener('pointerup',up); c.addEventListener('pointercancel',up); });
     gridEl.appendChild(rw);
-    const pad=document.createElement('div'); pad.className='pad'; pad.textContent=p.l; pad.addEventListener('pointerdown',e=>{ ensureAudio(); pad.setPointerCapture(e.pointerId); selected={set:curSet,idx:i}; const r=pad.getBoundingClientRect(); const v=Math.min(1,Math.max(0.4,1-(e.clientY-r.top)/r.height)); const stop=p.f(v,(i%4-1.5)/1.5*0.7,p.p); pad.classList.add('lit'); heldNames.set(e.pointerId,{stop,nm:pad}); if(editMode) openEditor(p); updateSel(); });
+    const pad=document.createElement('div'); pad.className='pad'; pad.textContent=p.l; dbl(pad,()=>{ selected={set:curSet,idx:i}; openEditor(p); updateSel(); }); pad.addEventListener('pointerdown',e=>{ ensureAudio(); pad.setPointerCapture(e.pointerId); selected={set:curSet,idx:i}; const r=pad.getBoundingClientRect(); const v=Math.min(1,Math.max(0.4,1-(e.clientY-r.top)/r.height)); const stop=p.f(v,(i%4-1.5)/1.5*0.7,p.p); pad.classList.add('lit'); heldNames.set(e.pointerId,{stop,nm:pad}); if(editMode) openEditor(p); updateSel(); });
     const padUp=e=>{ const h=heldNames.get(e.pointerId); if(!h) return; h.stop&&h.stop(); h.nm.classList.remove('lit'); heldNames.delete(e.pointerId); }; pad.addEventListener('pointerup',padUp); pad.addEventListener('pointercancel',padUp); padsEl.appendChild(pad); });
   updateSel(); }
 const heldNames=new Map();
 function updateSel(){ const p=selPad(); $('#sel-name').textContent=SETS[selected.set].name+' · '+p.l; if(!$('#editor').hidden) openEditor(p); renderGrid(); padsEl.querySelectorAll('.pad').forEach((el,i)=>el.classList.toggle('sel',selected.set===curSet&&i===selected.idx)); }
 const anySolo=()=>Object.values(SETS).some(st=>st.pads.some(p=>p.solo)); const padOn=p=>!p.mute&&(!anySolo()||p.solo);
 function renderGrid(){ const solo=anySolo(); gridEl.querySelectorAll('.rw').forEach((rw,i)=>{ const p=SETS[curSet].pads[i]; rw.classList.toggle('sel',selected.set===curSet&&i===selected.idx); rw.classList.toggle('dim',p.mute||(solo&&!p.solo)); rw.querySelectorAll('.c').forEach((c,k)=>{ c.classList.toggle('on',!!p.pat[k]); c.classList.toggle('cur',seq.on&&p.step===k); c.classList.toggle('held',heldCells.has(i+':'+k)); }); }); }
-function openEditor(p){ $('#editor').hidden=false; $('#ed-name').textContent=SETS[selected.set].name+' · '+p.l+' '+p.s; document.querySelectorAll('[data-pp]').forEach(r=>r.value=p.p[r.dataset.pp]); $('#ed-rev').classList.toggle('on',p.p.reverse); $('#ed-clean').classList.toggle('on',!p.p.clean);
+function openEditor(p){ $('#editor').hidden=false; $('#ed-name').textContent=SETS[selected.set].name+' › '+p.l+' — この音だけ'; document.querySelectorAll('[data-pp]').forEach(r=>r.value=p.p[r.dataset.pp]); $('#ed-rev').classList.toggle('on',p.p.reverse); $('#ed-clean').classList.toggle('on',!p.p.clean);
   }
 $('#ed-clean').onclick=()=>{ const p=selPad(); p.p.clean=!p.p.clean; $('#ed-clean').classList.toggle('on',!p.p.clean); ensureAudio(); p.f(p.p.vel,0,p.p); };
 document.querySelectorAll('[data-pp]').forEach(r=>r.oninput=()=>{ selPad().p[r.dataset.pp]=+r.value; });
 $('#ed-rev').onclick=()=>{ const p=selPad(); p.p.reverse=!p.p.reverse; $('#ed-rev').classList.toggle('on',p.p.reverse); ensureAudio(); p.f(p.p.vel,0,p.p); };
 $('#ed-close').onclick=()=>{ $('#editor').hidden=true; }; $('#ed-reset').onclick=()=>{ const p=selPad(); const keep={clean:p.p.clean,voice:p.p.voice}; p.p=Object.assign(PP(),keep); openEditor(p); };
-$('#b-edit').onclick=()=>{ editMode=!editMode; $('#b-edit').classList.toggle('on',editMode); if(editMode) openEditor(selPad()); else $('#editor').hidden=true; };
+
 $('#b-clrpat').onclick=()=>{ const p=selPad(); p.pat.fill(0); renderGrid(); toast(p.l+' の行を消しました'); };
 $('#b-clrall').onclick=()=>{ for(const st of Object.values(SETS)) st.pads.forEach(p=>{ p.pat.fill(0); p.mute=false; p.solo=false; }); if(seq.on) runSeq(false); renderGrid(); toast('全セットのステップを消しました'); };
 
@@ -514,12 +517,14 @@ document.addEventListener('keydown',e=>{ if(e.repeat||e.ctrlKey||e.metaKey||e.al
   if(!(k in KBMAP)||mode!=='glide'||instr.kind!=='p'||kbHeld.has(k)) return; ensureAudio(); const sm=KBMAP[k]+kbdOct*12-12, pn=((sm+12)/24-0.5)*0.8*instr.mac.spread; const st={last:kbdNote(sm,0.75,pn,false),stop:null}; st.timer=setTimeout(()=>{ if(kbHeld.get(k)===st&&!st.stop) st.stop=watchHold(kbdHold(sm,0.7,pn)); },190); kbHeld.set(k,st); });
 document.addEventListener('keyup',e=>{ const k=e.key.toLowerCase(), st=kbHeld.get(k); if(!st) return; clearTimeout(st.timer); if(st.stop) st.stop(); kbHeld.delete(k); });
 $('#gl-chord').onclick=e=>{ glChord=!glChord; e.target.classList.toggle('on',glChord); };
-const instrEl=$('#instr'); INSTR.forEach(it=>{ const b=document.createElement('button'); b.textContent=it.kind==='n'?'ノイズ / グリッチ':it.name; b.dataset.i=it.id; if(it.kind!=='p') b.classList.add('grp'); b.onclick=()=>{ ensureAudio(); if(mode==='glide'){ instr=it; applyDrive(); renderInstr(); } else { curSet=it.id; if(selected.set!==curSet) selected={set:curSet,idx:0}; build(); } }; instrEl.appendChild(b); });
+const instrEl=$('#instr'); INSTR.forEach(it=>{ const b=document.createElement('button'); b.textContent=it.kind==='n'?'ノイズ / グリッチ':it.name; b.dataset.i=it.id; if(it.kind!=='p') b.classList.add('grp'); b.onclick=()=>{ ensureAudio(); if(mode==='glide'){ instr=it; applyDrive(); renderInstr(); } else { curSet=it.id; if(selected.set!==curSet) selected={set:curSet,idx:0}; build(); } }; dbl(b,()=>openMacro(it)); instrEl.appendChild(b); });
+let macTarget=INSTR[0]; function openMacro(it){ macTarget=it; $('#macro').hidden=false; $('#mac-name').textContent=it.name+' — 全体の音色'; document.querySelectorAll('[data-mac]').forEach(r=>r.value=it.mac[r.dataset.mac]); $('#b-mac').classList.add('on'); }
+$('#mac-close').onclick=()=>{ $('#macro').hidden=true; $('#b-mac').classList.remove('on'); };
 document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{ mode=b.dataset.mode; build(); });
-function renderInstr(){ const cur=mode==='glide'?instr.id:curSet; instrEl.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.i===cur)); $('#mac-name').textContent=instr.name; document.querySelectorAll('[data-mac]').forEach(r=>r.value=instr.mac[r.dataset.mac]); $('#gl-scale').hidden=instr.kind!=='p'; $('#gl-kbd').hidden=instr.kind!=='p'; }
-document.querySelectorAll('[data-mac]').forEach(r=>r.oninput=()=>{ instr.mac[r.dataset.mac]=+r.value; if(r.dataset.mac==='drive') applyDrive(); });
-$('#b-mac').onclick=()=>{ const m=$('#macro'); m.hidden=!m.hidden; $('#b-mac').classList.toggle('on',!m.hidden); };
-$('#mac-reset').onclick=()=>{ instr.mac=Object.assign(MAC(),instr.m||{}); applyDrive(); renderInstr(); };
+function renderInstr(){ const cur=mode==='glide'?instr.id:curSet; instrEl.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.i===cur)); if(!$('#macro').hidden&&macTarget!==instr&&mode==='glide') openMacro(instr); $('#gl-scale').hidden=instr.kind!=='p'; $('#gl-kbd').hidden=instr.kind!=='p'; }
+document.querySelectorAll('[data-mac]').forEach(r=>r.oninput=()=>{ macTarget.mac[r.dataset.mac]=+r.value; if(r.dataset.mac==='drive'&&macTarget===instr) applyDrive(); });
+$('#b-mac').onclick=()=>{ if($('#macro').hidden||macTarget!==instr) openMacro(instr); else $('#mac-close').onclick(); };
+$('#mac-reset').onclick=()=>{ macTarget.mac=Object.assign(MAC(),macTarget.m||{}); if(macTarget===instr) applyDrive(); openMacro(macTarget); };
 renderInstr();
 function drawKbd(fx0,acc,fg,dim,line){ const w=fx0/14, bh=GH*0.58; for(let i=0;i<14;i++){ const sm=Math.floor(i/7)*12+WHITE[i%7]-12, a=lit.get('k'+sm)||0; gg.fillStyle=a>0?acc:'#141414'; gg.globalAlpha=a>0?0.25+a*0.5:1; gg.fillRect(i*w+1,1,w-2,GH-2); gg.globalAlpha=1; gg.strokeStyle=line; gg.strokeRect(i*w+0.5,0.5,w-1,GH-1); if(a>0){ lit.set('k'+sm,a-0.05); if(a<=0.05) lit.delete('k'+sm); }
       const nm=KEYS[((key+sm)%12+12)%12]; gg.fillStyle=sm%12===0?fg:dim; gg.font=(sm%12===0?'600 ':'')+'10px '+css('--mono'); gg.textAlign='center'; gg.textBaseline='bottom'; gg.fillText(nm+(sm%12===0?(4+Math.floor((sm+key)/12)):''),i*w+w/2,GH-8); }
