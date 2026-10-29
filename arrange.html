@@ -448,11 +448,12 @@ function newStyle(){ return {burst:Math.random(),spread:0.2+Math.random()*0.8,dr
 let randStyle=newStyle();
 function randStart(st){ let on=true, rate=1, last=null, rep=0; const loop=()=>{ if(!on) return; const u=Math.min(1,Math.max(0,st.rx/(GW-fxW()))), vv=Math.min(1,Math.max(0,1-st.ry/GH));
     const r0=Math.min(GR-1,Math.floor(vv*GR)); let c,r;
-    if(instr.kind==='n'){ const w=randStyle.kinds; const tot=w.reduce((a,b)=>a+b,0); let x=Math.random()*tot, k=0; while(x>w[k]&&k<4){ x-=w[k]; k++; } r=k; c=Math.min(GC-1,Math.max(0,Math.round(u*(GC-1)+(Math.random()-0.5)*2))); }
+    if(instr.kind==='n'){ const w=randStyle.kinds.map((x,i)=>(i===1||i===4)?x*0.35:x); const tot=w.reduce((a,b)=>a+b,0); let x=Math.random()*tot, k=0; while(x>w[k]&&k<4){ x-=w[k]; k++; } r=k; c=Math.min(GC-1,Math.max(0,Math.round(u*(GC-1)+(Math.random()-0.5)*2))); }   // the multi-hit rows (ツツツ, チリ) come up less often
     else { if(last&&Math.random()<randStyle.repeat*0.6){ c=last.c; r=last.r; } else { const sp=randStyle.spread; r=Math.min(GR-1,Math.max(0,r0+Math.round((Math.random()-0.5)*sp*4))); c=Math.min(GC-1,Math.max(0,Math.round(u*(GC-1)+(Math.random()-0.5)*sp*5))); } }
     last={c,r}; const acc=Math.random()<randStyle.accent*0.25; glNote(c,r,acc?0.9:0.3+Math.random()*0.35,true,!acc);
-    const base=40+(1-u)*(1-u)*520; rate*=1+(Math.random()-0.5)*randStyle.drift*0.5; rate=Math.min(3,Math.max(0.35,rate)); let wait=base*rate;
-    if(Math.random()<randStyle.burst*0.5) wait*=0.25; else if(Math.random()<randStyle.swing*0.3) wait*=2.2;
+    const isN=instr.kind==='n'; const base=isN?(110+(1-u)*(1-u)*760):(40+(1-u)*(1-u)*520); rate*=1+(Math.random()-0.5)*randStyle.drift*0.5; rate=Math.min(3,Math.max(0.35,rate)); let wait=base*rate;
+    if(isN&&(r===1||r===4)) wait*=2.6;   // a multi-hit sound already filled the time — leave room after it
+    if(Math.random()<randStyle.burst*(isN?0.25:0.5)) wait*=isN?0.5:0.25; else if(Math.random()<randStyle.swing*0.3) wait*=2.2;
     setTimeout(loop,wait); }; loop(); return ()=>{ on=false; }; }
 $('#gl-rand').onclick=()=>{ randMode=!randMode; $('#gl-rand').classList.toggle('on',randMode); if(!randMode) stopAllHolds(); };
 $('#gl-seed').onclick=()=>{ randStyle=newStyle(); const b=$('#gl-seed'); b.classList.add('on'); setTimeout(()=>b.classList.remove('on'),150); };
