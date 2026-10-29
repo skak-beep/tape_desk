@@ -455,7 +455,7 @@ function randStart(st){ let on=true, rate=1, last=null, rep=0; const loop=()=>{ 
 $('#gl-rand').onclick=()=>{ randMode=!randMode; $('#gl-rand').classList.toggle('on',randMode); if(!randMode) stopAllHolds(); };
 $('#gl-seed').onclick=()=>{ randStyle=newStyle(); const b=$('#gl-seed'); b.classList.add('on'); setTimeout(()=>b.classList.remove('on'),150); };
 function chordSemis(c,r){ const sm=cellSemi(c,r); if(!glChord) return [sm]; const sc=SC[glScale], step=glScale==='penta'?2:3, deg=c+step*r, L=sc.length; const at=d=>12*Math.floor(d/L)+sc[d%L]-12; return [sm,at(deg+2),at(deg+4)]; }   // diatonic triad on that degree
-const NROWS=['ツ','ツツツ','プツッ','ザッ','白','乱'];
+const NROWS=['ツ','ツツツ','プツッ','コツ','チリ','乱'];
 function glNote(c,r,v,quick,drag){ const m=instr.mac, pn=(c-(GC-1)/2)/(GC-1)*1.4*m.spread; lit.set(c+':'+r,1); const u=c/(GC-1);
   if(instr.kind==='p'){ const pp=macPP(m); if(drag){ pp.decay*=0.4; pp.rev*=0.55; pp.level*=0.85; } if(glChord&&!['revgtr','robo','bed','sparkle'].includes(instr.voice)){ { const st=chordSemis(c,r).map((sm,k)=>tone(sm,v*(k?0.8:1),pn,pp)); return f=>st.forEach(x=>x&&x(f)); } } if(instr.voice==='revgtr'){ revChord(cellSemi(c,r),v,pn,pp,false); return; } if(instr.voice==='robo'){ robo(cellSemi(c,r),v,pn,pp,false); return; } if(instr.voice==='bed'){ bed(cellSemi(c,r),v,pn,pp,false); return; } if(instr.voice==='sparkle'){ sparkle(cellSemi(c,r),v,pn,pp,false); return; } return tone(cellSemi(c,r),v,pn,pp); }
   if(instr.kind==='g'){ if(!sample){ toast('出力タブ「粒の素材」で録音かファイルを入れてください'); return; } const pp=macPP(m,{pitch:[-12,-7,0,0,7,12][r]+m.oct*12,voice:undefined}); grain(Math.min(7,c),v,pn,pp); return; }
@@ -463,14 +463,14 @@ function glNote(c,r,v,quick,drag){ const m=instr.mac, pn=(c-(GC-1)/2)/(GC-1)*1.4
   switch(r){ case 0: noise({hp:1200+u*5000,len:0.003+u*0.004,gain:g*0.5,pan:pn},pp); break;
     case 1: { const n=2+Math.round(u*5), iv=0.028+(1-u)*0.03; for(let k=0;k<n;k++) noise({hp:2000+u*3000,len:0.006,gain:g*0.6*Math.pow(0.85,k),pan:pn,rev:0.15},pp,ac.currentTime+k*iv); break; }
     case 2: noise({bp:180+u*700,q:1.5,len:0.012+u*0.01,gain:g*0.9,pan:pn},pp); noise({hp:2000,len:0.004,gain:0.25,pan:pn},pp); break;
-    case 3: noise({bp:900+u*2500,q:0.7,len:0.04+u*0.2,gain:g*0.35,pan:pn,rev:0.3},pp); break;
-    case 4: noise({hp:200+u*2500,len:0.08+u*0.5,gain:g*0.22,pan:pn,rev:0.2,fadeIn:0.01},pp); break;   // white noise puff, column = brightness/length
+    case 3: { const o=ac.createOscillator(), gg=ac.createGain(), t=ac.currentTime, f0=400+u*1400; o.type='triangle'; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f0*0.55,t+0.03); gg.gain.setValueAtTime(g*0.3*pp.level,t); gg.gain.exponentialRampToValueAtTime(0.0001,t+0.03+u*0.03); o.connect(gg).connect(gate(t,0.1,pp,pn)); revSend(gg,0.3*pp.rev); o.start(t); o.stop(t+0.1); break; }   // コツ: small wooden tick
+    case 4: { for(let k=0;k<2+Math.round(u*3);k++) noise({hp:4000+u*3000,len:0.002,gain:g*0.18,pan:pn+(Math.random()-0.5)*0.4},pp,ac.currentTime+k*(0.006+Math.random()*0.02)); break; }   // チリ: a few dust grains
     case 5: { let k=0, dt=0; const n=4+Math.floor(Math.random()*6); const acc=Math.random()<0.5; for(k=0;k<n;k++){ const r2=[0,0,1,2,3,4][Math.floor(Math.random()*6)]; const cc=Math.floor(Math.random()*GC); setTimeout(()=>glNote(cc,r2,0.5+Math.random()*0.4,true),dt); dt+=acc?30+k*k*8:160-k*14; } break; } } }
 function glSwell(c,r,v){ const m=instr.mac, pn=(c-(GC-1)/2)/(GC-1)*1.4*m.spread, u=c/(GC-1);
   if(instr.kind==='p'&&instr.voice==='vpiano'){ const stops=chordSemis(c,r).map(sm=>pianoHold(sm,v,pn,macPP(m))); return ()=>stops.forEach(f=>f()); }
   if(instr.kind==='p') return instr.voice==='revgtr'?revChord(cellSemi(c,r),v,pn,macPP(m),true):instr.voice==='robo'?robo(cellSemi(c,r),v,pn,macPP(m),true):instr.voice==='bed'?bed(cellSemi(c,r),v,pn,macPP(m),true):instr.voice==='sparkle'?sparkle(cellSemi(c,r),v,pn,macPP(m),true):swell(cellSemi(c,r),v,pn,macPP(m));
   if(instr.kind==='n'){ const pp=macPP(m,{voice:undefined});
-    if(r===4) return noise({hp:200+u*2500,len:1,gain:0.22,pan:pn,rev:0.2,fadeIn:0.05,hold:true},pp);
+    if(r===4||r===3){ let on=true; const loop=()=>{ if(!on) return; glNote(c,r,0.4,true); setTimeout(loop,120+(1-u)*400+Math.random()*120); }; loop(); return ()=>{ on=false; }; }
     if(r===5){ let on=true, rate=120, dir=1; const loop=()=>{ if(!on) return; const r2=[0,0,1,2,3,4][Math.floor(Math.random()*6)], cc=Math.floor(Math.random()*GC); glNote(cc,r2,0.4+Math.random()*0.5,true); rate*=dir>0?0.85:1.18; if(rate<28) dir=-1; if(rate>420) dir=1; if(Math.random()<0.08) dir=-dir; setTimeout(loop,rate*(0.7+Math.random()*0.6)); }; loop(); return ()=>{ on=false; }; }
     if(r===1){ let on=true; const loop=()=>{ if(!on) return; glNote(c,r,0.6,true); setTimeout(loop,90+(1-u)*160); }; loop(); return ()=>{ on=false; }; }
     if(r===0){ let on=true; const loop=()=>{ if(!on) return; glNote(c,r,0.5,true); setTimeout(loop,40+(1-u)*120); }; loop(); return ()=>{ on=false; }; } }
