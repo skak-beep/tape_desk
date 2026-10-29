@@ -187,8 +187,13 @@ function unlock(){ try{ ensureAudio(); if(ac.state!=='running') ac.resume(); con
 ['touchend','click','keydown'].forEach(ev=>document.addEventListener(ev,unlock,{passive:true}));
 setInterval(()=>{ if(ac&&ac.state!=='running') ac.resume(); const el=document.getElementById('r-audio'); if(el) el.textContent=ac?(ac.state==='running'?'♪':'zz'):'·'; },400);
 window._arr={get ac(){return ac},get M(){return M}};
-const wakeEl=document.getElementById('wake'); const wakeTap=()=>{ unlock(); setTimeout(()=>{ if(ac&&ac.state==='running'){ wakeEl.hidden=true; } },150); setTimeout(()=>{ if(ac&&ac.state==='running') wakeEl.hidden=true; },700); };
+const wakeEl=document.getElementById('wake'); let needRebuild=false;
+const wakeTap=()=>{ if(needRebuild){ rebuildAudio(); needRebuild=false; } unlock(); setTimeout(()=>{ if(ac&&ac.state==='running') wakeEl.hidden=true; },150); setTimeout(()=>{ if(ac&&ac.state==='running') wakeEl.hidden=true; else { needRebuild=true; wakeEl.querySelector('div').innerHTML='<b>構成</b><br>もう一度タップ(エンジンを作り直します)'; } },800); };
 wakeEl.addEventListener('touchend',wakeTap,{passive:true}); wakeEl.addEventListener('click',wakeTap);
+/* iOS interrupts the engine when the app goes to the background; coming back it may be suspended, or 'running' but frozen. Detect both and ask for one tap to rebuild. */
+function rebuildAudio(){ try{ if(ac) ac.close(); }catch(e){} ac=null; M=null; proc=null; noiseB=null; bendable.clear(); glPointers.clear(); heldNames.clear(); if(typeof tlPlaying!=='undefined'&&tlPlaying){ playing_nodes=[]; tlPlaying=false; $('#t-play').textContent='▶ Play'; $('#t-play').classList.remove('on'); } if(seq.on) runSeq(false); recording=false; $('#b-rec').classList.remove('on'); $('#b-rec').textContent='● Rec phrase'; ensureAudio(); applyDrive(); toast('音のエンジンを作り直しました'); }
+let lastCT=-1, stuck=0; setInterval(()=>{ if(!ac) return; if(document.hidden) return; if(ac.state!=='running'){ ac.resume(); stuck++; } else if(ac.currentTime===lastCT){ stuck++; } else stuck=0; lastCT=ac.currentTime; if(stuck>=3&&wakeEl.hidden){ needRebuild=true; wakeEl.querySelector('div').innerHTML='<b>構成</b><br>タップして音を起こす<br><small>画面を離れていたので、音のエンジンが止まりました</small>'; wakeEl.hidden=false; } },500);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&ac){ lastCT=-1; stuck=0; ac.resume(); } });
 let toastT; const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600);};
 document.querySelectorAll('.tabs span').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tabs span').forEach(x=>x.classList.toggle('on',x===t));document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===t.dataset.tab));});
 const KEYS=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; let key=0; const hz=m=>440*Math.pow(2,(m-69)/12), root=()=>48+key;
