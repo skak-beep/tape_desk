@@ -254,6 +254,26 @@ function swell(semi,v,pn,pp){ pp=pp||PP(); const t=ac.currentTime, f=hz(root()+1
   const vib=ac.createOscillator(); vib.frequency.value=(pp.wob||0)>0.3?0.9:4.6; const vg=ac.createGain(); vg.gain.setValueAtTime(0,t); vg.gain.linearRampToValueAtTime(5+(pp.wob||0)*35,t+1.2); vib.connect(vg); vib.start(t); const oscs=[];
   for(const [mul,gain,det] of [[1,1,0],[1,0.35,4],[2,0.12+pp.tone*0.2,0],[3,0.03,0]]){ const o=ac.createOscillator(); o.type='sine'; o.frequency.value=f*mul; o.detune.value=det+bend*100; vg.connect(o.detune); const og=ac.createGain(); og.gain.value=gain; o.connect(og).connect(g); o.start(t); oscs.push(o); const e={o,det}; bendable.add(e); o.onended=()=>bendable.delete(e); }
   g.connect(out); revSend(g,1.6*pp.rev); return ()=>{ const tt=ac.currentTime; g.gain.cancelScheduledValues(tt); g.gain.setTargetAtTime(0.0001,tt,0.35); oscs.forEach(o=>o.stop(tt+2)); vib.stop(tt+2); }; }
+/* reverse guitar: a wide add9 chord (low root, 5th, octave, 9th), warm, gentle 1.5 s swell, slow 2.9 Hz tremolo, chorus pair, 180 ms release */
+function revChord(semi,v,pn,pp,hold){ pp=pp||PP(); const t=ac.currentTime, bm=root()+12+semi+pp.pitch, rise=(1.2+0.8*(1-v))*(pp.attMul||1), dur=hold?60:rise+0.6+v*0.6, lvl=0.13*(0.6+v*0.4)*pp.level;
+  const g=ac.createGain(), out=gate(t,dur,{...pp,reverse:false,cut:1},pn); g.gain.setValueAtTime(lvl*0.35,t); g.gain.exponentialRampToValueAtTime(lvl,t+rise); if(!hold){ g.gain.setValueAtTime(lvl,t+dur-0.18); g.gain.linearRampToValueAtTime(0.0001,t+dur); }
+  const lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.Q.value=0.7; lp.frequency.setValueAtTime(900+pp.tone*800,t); lp.frequency.linearRampToValueAtTime(1500+pp.tone*1600,t+rise);
+  const tr=ac.createOscillator(); tr.frequency.value=2.9; const tg=ac.createGain(); tg.gain.value=0.17; const base=ac.createGain(); base.gain.value=0.83; tr.connect(tg).connect(base.gain); lp.connect(base).connect(g); tr.start(t); const oscs=[tr];
+  const tones=[[-12,1.0],[0,0.8],[7,0.6],[12,0.45],[14,0.3],[19,0.18]];   // root below, root, 5th, octave, 9th, 12th
+  for(const [iv,gn] of tones) for(const det of [-6,6]){ const f=hz(bm+iv); for(const [mul,pg] of [[1,1],[2,0.5],[3,0.3],[4,0.16],[5,0.08]]){ const o=ac.createOscillator(); o.type='sine'; o.frequency.value=f*mul; o.detune.value=det+bend*100; const og=ac.createGain(); og.gain.value=gn*pg*0.5; o.connect(og).connect(lp); o.start(t); o.stop(t+dur+0.3); oscs.push(o); const e={o,det}; bendable.add(e); o.onended=()=>bendable.delete(e); } }
+  g.connect(out); revSend(g,1.3*pp.rev); return ()=>{ const tt=ac.currentTime; g.gain.cancelScheduledValues(tt); g.gain.setValueAtTime(g.gain.value,tt); g.gain.linearRampToValueAtTime(0.0001,tt+0.18); oscs.forEach(o=>o.stop(tt+0.3)); }; }
+/* robo: nostalgic computer talk — short beeps that hop by octaves/fifths, a soft warble, a touch of 2nd harmonic; hold = keeps chattering */
+function robo(semi,v,pn,pp,hold){ pp=pp||PP(); const base=root()+36+semi+pp.pitch; let on=true, t=ac.currentTime+0.01; const out=gate(ac.currentTime,hold?60:2,{...pp,reverse:false,cut:1},pn);
+  const beep=(at,semiOff,len,g)=>{ const f=hz(base+semiOff); const o=ac.createOscillator(); o.type='sine'; o.frequency.value=f; const h=ac.createOscillator(); h.type='sine'; h.frequency.value=f*2; const hg=ac.createGain(); hg.gain.value=0.12+pp.tone*0.3;
+    const fm=ac.createOscillator(); fm.frequency.value=18+Math.random()*40; const fg=ac.createGain(); fg.gain.value=(pp.wob*60)+8; fm.connect(fg).connect(o.detune); const gg=ac.createGain(); gg.gain.setValueAtTime(0.0001,at); gg.gain.exponentialRampToValueAtTime(g,at+0.006); gg.gain.setValueAtTime(g,at+len-0.025); gg.gain.exponentialRampToValueAtTime(0.0001,at+len);
+    if(Math.random()<0.25){ o.frequency.setValueAtTime(f,at); o.frequency.exponentialRampToValueAtTime(f*(Math.random()<0.5?2:0.5),at+len*0.8); }   // the occasional whistle slide
+    const lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=5000+pp.tone*4000; o.connect(gg); h.connect(hg).connect(gg); gg.connect(lp).connect(out); revSend(gg,0.5*pp.rev); o.start(at); h.start(at); fm.start(at); o.stop(at+len+0.02); h.stop(at+len+0.02); fm.stop(at+len+0.02); }
+  const lvl=0.11*(0.5+v*0.5)*pp.level; const n=hold?999:2+Math.floor(Math.random()*3); const hops=[0,12,7,-12,5,-7,12,24,-5];
+  let off=0; for(let k=0;k<n;k++){ const len=(0.05+Math.random()*0.18)*(0.6+pp.decay*0.5); off=k===0?0:(Math.random()<0.6?hops[Math.floor(Math.random()*hops.length)]:off); if(off>24) off=12; if(off<-12) off=0;
+    if(hold){ const at=t; setTimeout(()=>{ if(on) beep(ac.currentTime+0.005,off,len,lvl); },Math.max(0,(at-ac.currentTime)*1000)); t+=len+0.03+Math.random()*0.12; if(t>ac.currentTime+1.2) break; }
+    else { beep(t,off,len,lvl); t+=len+0.02+Math.random()*0.06; } }
+  if(hold){ const cont=()=>{ if(!on) return; const len=0.05+Math.random()*0.18, o2=hops[Math.floor(Math.random()*hops.length)]; beep(ac.currentTime+0.005,o2,len,lvl); setTimeout(cont,(len+0.03+Math.random()*0.15)*1000); }; setTimeout(cont,1200); }
+  return ()=>{ on=false; }; }
 function revHold(semi,v,pn,pp){ pp=pp||PP(); const t=ac.currentTime, f=hz(root()+12+semi+pp.pitch), g=ac.createGain(), out=gate(t,6,{...pp,reverse:false,cut:1},pn), rise=(1.6+(1-v))*(pp.attMul||1); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.16*pp.level,t+rise); g.gain.exponentialRampToValueAtTime(0.19*pp.level,t+rise+6);
   const nlp=ac.createBiquadFilter(); nlp.type='lowpass'; nlp.Q.value=0.8; nlp.frequency.setValueAtTime(500,t); nlp.frequency.exponentialRampToValueAtTime(2200+pp.tone*3500,t+rise); const tr=ac.createOscillator(); tr.frequency.value=8.5; const tg=ac.createGain(); tg.gain.value=0.22; const base=ac.createGain(); base.gain.value=0.78; tr.connect(tg).connect(base.gain); nlp.connect(base).connect(g); tr.start(t); const oscs=[tr];
   for(const [mul,gain,det] of [[1,1,-5],[1,1,5],[2,0.6,-5],[2,0.6,5],[3,0.45,0],[4,0.3,0],[5,0.2,0],[6,0.14,0],[7,0.1,0],[8,0.07,0]]){ const o=ac.createOscillator(); o.type='sine'; o.frequency.value=f*mul; o.detune.value=det+bend*100; const og=ac.createGain(); og.gain.value=gain; o.connect(og).connect(nlp); o.start(t); oscs.push(o); const e={o,det}; bendable.add(e); o.onended=()=>bendable.delete(e); }
@@ -376,7 +396,7 @@ $('#a-grav').onclick=e=>{ grav=grav>=100?20:grav+20; e.target.textContent='Grav 
 /* ---------- glide surface: a lattice of consonant neighbours; drag = runs of short notes, hold = swell; 2nd finger = bend + tone ---------- */
 const INSTR=[
   {id:'pluck',name:'Pluck',kind:'p',voice:'pluck'},{id:'glass',name:'Glass',kind:'p',voice:'glass'},{id:'piano',name:'Piano',kind:'p',voice:'piano'},{id:'box',name:'Music box',kind:'p',voice:'box'},{id:'chime',name:'Chime',kind:'p',voice:'chime'},{id:'harp',name:'Harp',kind:'p',voice:'harp'},{id:'bell',name:'Bell',kind:'p',voice:'bell'},{id:'pad',name:'Pad',kind:'p',voice:'pad'},
-  {id:'revgtr',name:'逆ギター',kind:'p',voice:'revgtr',m:{bright:0.5,rev:0.65,att:0.5}},{id:'tapeKeys',name:'テープ鍵盤',kind:'p',voice:'tapeKeys',m:{wob:0.35,bright:0.4}},{id:'choir',name:'カセット合唱',kind:'p',voice:'choir',m:{wob:0.25,att:0.7}},{id:'organ',name:'VHSオルガン',kind:'p',voice:'organ',m:{wob:0.15}},{id:'sub',name:'サブ',kind:'p',voice:'sub',m:{oct:-1,rev:0.2}},
+  {id:'revgtr',name:'逆ギター',kind:'p',voice:'revgtr',m:{bright:0.5,rev:0.7,att:0.5,spread:0.4}},{id:'tapeKeys',name:'テープ鍵盤',kind:'p',voice:'tapeKeys',m:{wob:0.35,bright:0.4}},{id:'choir',name:'カセット合唱',kind:'p',voice:'choir',m:{wob:0.25,att:0.7}},{id:'organ',name:'VHSオルガン',kind:'p',voice:'organ',m:{wob:0.15}},{id:'sub',name:'サブ',kind:'p',voice:'sub',m:{oct:-1,rev:0.2}},{id:'robo',name:'ロボ',kind:'p',voice:'robo',m:{wob:0.2,bright:0.4,rev:0.35,dec:0.5}},
   {id:'noise',name:'ノイズ',kind:'n'},{id:'grain',name:'粒',kind:'g'} ];
 const MAC=()=>({att:0.5,dec:0.5,bright:0.5,wob:0,drive:0,rev:0.6,oct:0,spread:0.6}); INSTR.forEach(i=>i.mac=Object.assign(MAC(),i.m||{}));
 let instr=INSTR[0]; const macPP=(m,extra)=>Object.assign(PP(),{clean:true,glide:true,voice:instr.voice,tone:m.bright,decay:0.3+m.dec*2.2,rev:m.rev*2,pitch:m.oct*12,attMul:Math.pow(6.3,(m.att-0.5)*2),wob:m.wob},extra||{});
@@ -390,7 +410,7 @@ function cellSemi(c,r){ const sc=SC[glScale], step=glScale==='penta'?2:3; const 
 const glPointers=new Map(); let glTone=0.5; const lit=new Map();
 const NROWS=['ツ','ツツツ','プツッ','ザッ','ザー','ピチー'];
 function glNote(c,r,v,quick){ const m=instr.mac, pn=(c-(GC-1)/2)/(GC-1)*1.4*m.spread; lit.set(c+':'+r,1); const u=c/(GC-1);
-  if(instr.kind==='p'){ const pp=macPP(m); tone(cellSemi(c,r),v,pn,pp); return; }
+  if(instr.kind==='p'){ const pp=macPP(m); if(instr.voice==='revgtr'){ revChord(cellSemi(c,r),v,pn,pp,false); return; } if(instr.voice==='robo'){ robo(cellSemi(c,r),v,pn,pp,false); return; } tone(cellSemi(c,r),v,pn,pp); return; }
   if(instr.kind==='g'){ if(!sample){ toast('出力タブ「粒の素材」で録音かファイルを入れてください'); return; } const pp=macPP(m,{pitch:[-12,-7,0,0,7,12][r]+m.oct*12,voice:undefined}); grain(Math.min(7,c),v,pn,pp); return; }
   const pp=macPP(m,{voice:undefined}); const g=0.35+v*0.5; // noise palette: row = kind, column = variation
   switch(r){ case 0: noise({hp:1200+u*5000,len:0.003+u*0.004,gain:g*0.5,pan:pn},pp); break;
@@ -400,7 +420,7 @@ function glNote(c,r,v,quick){ const m=instr.mac, pn=(c-(GC-1)/2)/(GC-1)*1.4*m.sp
     case 4: noise({bp:500+u*2500,q:0.6+u*0.6,len:0.3+u*0.5,gain:g*0.25,pan:pn,rev:0.4,fadeIn:0.03},pp); break;
     case 5: chirp(0.3+u*0.7,pn,Object.assign(pp,{pitch:(u-0.5)*12})); break; } }
 function glSwell(c,r,v){ const m=instr.mac, pn=(c-(GC-1)/2)/(GC-1)*1.4*m.spread, u=c/(GC-1);
-  if(instr.kind==='p') return instr.voice==='revgtr'?revHold(cellSemi(c,r),v,pn,macPP(m)):swell(cellSemi(c,r),v,pn,macPP(m));
+  if(instr.kind==='p') return instr.voice==='revgtr'?revChord(cellSemi(c,r),v,pn,macPP(m),true):instr.voice==='robo'?robo(cellSemi(c,r),v,pn,macPP(m),true):swell(cellSemi(c,r),v,pn,macPP(m));
   if(instr.kind==='n'){ const pp=macPP(m,{voice:undefined});
     if(r===4) return noise({bp:500+u*2500,q:0.6+u*0.6,len:1,gain:0.3,pan:pn,rev:0.4,fadeIn:0.05,hold:true},pp);
     if(r===1){ let on=true; const loop=()=>{ if(!on) return; glNote(c,r,0.6,true); setTimeout(loop,90+(1-u)*160); }; loop(); return ()=>{ on=false; }; }
