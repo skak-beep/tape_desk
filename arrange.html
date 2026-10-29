@@ -33,16 +33,14 @@ body[data-mode=glide]{--mc:#ff7a5a} body[data-mode=step]{--mc:#45a6ff}
 .plate #glide{border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important}
 .pl-l,.pl-r{position:absolute;top:0;border-radius:18px;transition:background .2s}
 .pl-l{left:0;width:calc(var(--sw) + 12px);bottom:-46px;background:#272538;display:flex;align-items:flex-end;justify-content:center;padding:0 0 7px;box-sizing:border-box}
-.pl-r{left:calc(var(--sw) + var(--gap));right:0;bottom:0;background:var(--pf)}
-body.rec .pl-l,body.rec .pl-r{background:var(--rec)}
+body.rec .pl-l{background:var(--rec)} body.rec .plate{box-shadow:0 0 0 2px var(--rec);border-radius:18px}
 .pl-l .seg{display:flex;gap:2px;background:#1a1926;border:0;border-radius:10px;padding:2px;width:calc(100% - 12px)} .pl-l .seg button{flex:1;min-height:28px;padding:4px 0;font-size:10px;letter-spacing:0;border:0;border-radius:8px;background:transparent;color:var(--dim);box-shadow:none} .pl-l .seg button.on{background:#4a4566;color:#fff;font-weight:600;box-shadow:none}
-.gtabs{display:flex;justify-content:flex-end;align-items:flex-start;padding:0 34px 0 0;min-height:46px}
-.gtabs .seg{display:flex;gap:14px;align-items:flex-start;border:0;background:transparent;border-radius:0;overflow:visible}
-.gtabs .seg button{position:relative;flex:none;border:0!important;border-radius:14px;min-height:30px;padding:6px 14px;margin-top:7px;background:#17171f;color:var(--dim);font-size:11px;letter-spacing:.04em;box-shadow:none}
-.gtabs .seg button.on{margin-top:0;border-radius:0 0 14px 14px;min-height:38px;padding:9px 16px 8px;background:var(--pf);color:var(--fg);font-weight:600;box-shadow:none}
-.gtabs .seg button.on::before,.gtabs .seg button.on::after{content:"";position:absolute;top:0;width:14px;height:14px;pointer-events:none}
-.gtabs .seg button.on::before{left:-14px;background:radial-gradient(circle at 0 100%,transparent 13.5px,var(--pf) 14px)}
-.gtabs .seg button.on::after{right:-14px;background:radial-gradient(circle at 100% 100%,transparent 13.5px,var(--pf) 14px)} .eye{vertical-align:-3px;margin-right:4px}
+.gtabs{display:flex;justify-content:flex-end;align-items:flex-start;padding:0 6px 0 0;margin-top:-6px;min-height:46px}
+.gtabs .seg{display:flex;gap:2px;border:0;border-radius:0 0 12px 12px;margin-left:auto;padding:3px 4px 4px;background:color-mix(in srgb,var(--mc) 32%,#17151f);overflow:visible}
+.gtabs .seg button{flex:none;min-height:30px;padding:5px 14px;font-size:11px;letter-spacing:.02em;border:0!important;border-radius:9px;background:transparent;color:color-mix(in srgb,var(--mc) 45%,#fff 25%);margin:0;box-shadow:none}
+.gtabs .seg button.on{background:var(--mc);color:#120a08;font-weight:600;box-shadow:none}
+.gtabs .seg button.on::before,.gtabs .seg button.on::after{content:none}
+ .eye{vertical-align:-3px;margin-right:4px}
 .grp button.on{background:var(--mc);border-color:var(--mc);color:#0a0a14}
 /* grid: 8 rows, each = name | rate | 16 steps */
 .grid{display:flex;flex-direction:column;gap:3px}
@@ -177,7 +175,7 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
       <button id="b-micclip">● Mic</button><span id="rec-status" class="lbl">READY</span>
     </div>
     <div class="gwrap" id="glide-wrap" hidden>
-      <div class="plate"><div class="pl-l"><div class="seg" id="seg-strip"><button data-strip="fx" class="on">FX</button><button data-strip="bend">ベンド</button></div></div><div class="pl-r"></div><canvas id="glide" hidden></canvas></div>
+      <div class="plate"><div class="pl-l"><div class="seg" id="seg-strip"><button data-strip="fx" class="on">FX</button><button data-strip="bend">ベンド</button></div></div><canvas id="glide" hidden></canvas></div>
       <div class="gtabs"><div class="seg" id="seg-view"><button data-view="grid" class="on">グリッド</button><button data-view="kbd">鍵盤</button></div></div>
     </div>
     <div id="glide-row" hidden>
@@ -502,7 +500,7 @@ const gl=$('#glide'), gg=gl.getContext('2d'); let GW=0,GH=0; const GC=6, GR=6; l
 const SC={penta:[0,3,5,7,10],minor:[0,2,3,5,7,8,10]};
 function glResize(){ const r=gl.getBoundingClientRect(); if(!r.width) return; const d=Math.min(2,devicePixelRatio||1); GW=r.width;GH=r.height; gl.width=GW*d; gl.height=GH*d; gg.setTransform(d,0,0,d,0,0); const pl=gl.parentElement; if(pl){ pl.style.setProperty('--sw',fxW()+'px'); pl.style.setProperty('--gap',GAP+'px'); } }
 new ResizeObserver(glResize).observe(gl);
-const GAP=20, fxW=()=>Math.max(54,(GW-GAP)*0.2), OX=()=>fxW()+GAP, GWg=()=>GW-fxW()-GAP, cellW=()=>GWg()/GC, cellH=()=>GH/GR;
+const GAP=4, fxW=()=>Math.max(54,(GW-GAP)*0.2), OX=()=>fxW()+GAP, GWg=()=>GW-fxW()-GAP, cellW=()=>GWg()/GC, cellH=()=>GH/GR;
 function cellSemi(c,r){ const sc=SC[glScale], step=glScale==='penta'?2:3; const deg=c+step*r; return 12*Math.floor(deg/sc.length)+sc[deg%sc.length]-12; }  // from C3 up ~2.5 octaves
 const glPointers=new Map(); let glTone=0.5, glChord=false, randMode=false, glKbd=false, kbdOct=0, stripFx=true; const lit=new Map();
 const stripZone=y=>Math.min(FXL.length-1,Math.max(0,Math.floor(y/GH*FXL.length)));
@@ -594,7 +592,7 @@ function drawKbd(fx0,acc,fg,dim,line){ const w=fx0/14, bh=GH*0.58; for(let i=0;i
 const FXC={st32:'#f06aa8',st16:'#8a7cff',dive:'#4f8cff',stop:'#ffb020',crk:'#ff5a5f'}; const ca2=(col,al)=>col+Math.round(al*255).toString(16).padStart(2,'0');
 function drawGlide(){ if(!GW) glResize(); if(!GW||$('#glide').hidden) return; gg.clearRect(0,0,GW,GH); const cw=cellW(), ch=cellH(), fx0=0, acc=instr.col, fg=css('--fg'), dim=css('--dim'), line=css('--line');
   const rr=(x,y,w,h,r)=>{ gg.beginPath(); gg.roundRect?gg.roundRect(x,y,w,h,r):gg.rect(x,y,w,h); };
-  gg.save(); gg.translate(OX(),0); rr(0,0,GWg(),GH,12); gg.fillStyle=css('--bg-2'); gg.fill(); rr(0,0,GWg(),GH,12); gg.clip(); if(isKbd()) drawKbd(GWg(),acc,fg,dim,line); else for(let c=0;c<GC;c++) for(let r=0;r<GR;r++){ const x=c*cw, y=(GR-1-r)*ch; const k=c+':'+r; const a=lit.get(k)||0; gg.strokeStyle=line; gg.strokeRect(x+0.5,y+0.5,cw-1,ch-1); if(a>0){ gg.fillStyle=acc; gg.globalAlpha=a*0.5; gg.fillRect(x+1,y+1,cw-2,ch-2); gg.globalAlpha=1; lit.set(k,a-0.05); if(a<=0.05) lit.delete(k); }
+  gg.save(); gg.translate(OX(),0); const GR4=[12,12,0,12]; rr(0,0,GWg(),GH,GR4); gg.fillStyle=css('--bg-2'); gg.fill(); rr(0,0,GWg(),GH,GR4); gg.clip(); if(isKbd()) drawKbd(GWg(),acc,fg,dim,line); else for(let c=0;c<GC;c++) for(let r=0;r<GR;r++){ const x=c*cw, y=(GR-1-r)*ch; const k=c+':'+r; const a=lit.get(k)||0; gg.strokeStyle=line; gg.strokeRect(x+0.5,y+0.5,cw-1,ch-1); if(a>0){ gg.fillStyle=acc; gg.globalAlpha=a*0.5; gg.fillRect(x+1,y+1,cw-2,ch-2); gg.globalAlpha=1; lit.set(k,a-0.05); if(a<=0.05) lit.delete(k); }
     let label='', strong=false; if(instr.kind==='p'){ const semi=cellSemi(c,r); label=KEYS[((key+semi)%12+12)%12]+(4+Math.floor((semi+key)/12)); strong=semi%12===0; } else if(instr.kind==='n'){ label=c===0?NROWS[r]:(r===1?(2+Math.round(c/(GC-1)*5))+'連':'·'.repeat(c)); strong=c===0; } else if(instr.kind==='d'){ label=c===0?DROWS[r]:(r===0?['','短','','','','808'][c]:r===4?['','開','開','シェ','シェ','シェ'][c]:r===5?['','リム','5度','5度','8va','8va'][c]:'·'.repeat(c)); strong=c===0; } else { label=c===0?['−8va','−5','0','0','+5','+8va'][r]:'粒'+(c+1); strong=c===0; }
     gg.fillStyle=strong?acc:dim; gg.font=(strong?'600 ':'')+'11px '+css('--mono'); gg.textAlign='center'; gg.textBaseline='middle'; gg.fillText(label,x+cw/2,y+ch/2); }
   gg.restore(); rr(fx0,0,fxW(),GH,12); gg.fillStyle='#121119'; gg.fill();
