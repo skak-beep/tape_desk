@@ -1,0 +1,276 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="theme-color" content="#0c0c0d"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style></head><body><title>雲 CLOUD</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* One dark screen: scrolling spectrogram (the music made visible), a BREATH pad you drag (density + loudness + brightness together),
+   six hold-to-break FX keys, a few level knobs. Drone + stochastic click cloud underneath. One accent color. */
+:root{--bg:#0a0a0b;--bg-2:#141415;--fg:#dcd7cb;--dim:#6c685f;--line:#262523;--acc:#ff7a1a;--acc-2:#a64f17;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;color-scheme:dark}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+#app{min-height:100%;display:flex;flex-direction:column;max-width:560px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px 14px;box-sizing:border-box;gap:10px}
+.top{display:flex;align-items:baseline;gap:14px;border-bottom:1px solid var(--line);padding-bottom:6px}
+.top .t{color:var(--acc);font-weight:600;font-size:14px;letter-spacing:.16em;white-space:nowrap}
+.tabs{display:flex;gap:14px;color:var(--dim)} .tabs span{cursor:pointer;padding:4px 0} .tabs span.on{color:var(--fg);border-bottom:1px solid var(--acc)}
+.top .r{margin-left:auto;color:var(--dim);font-size:11px;white-space:nowrap} .top .r b{color:var(--fg);font-weight:500}
+#spec{width:100%;height:120px;display:block;border:1px solid var(--line)}
+.pane{display:none;flex-direction:column;gap:10px}.pane.on{display:flex}
+#pad{width:100%;height:170px;display:block;border:1px solid var(--line);touch-action:none;background:var(--bg)}
+.padcap{display:flex;justify-content:space-between;color:var(--dim);font-size:10px;margin-top:-6px}
+.fx{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.fx button{min-height:54px;font-size:12px;touch-action:none}
+.fx button small{display:block;color:var(--dim);font-size:9px;margin-top:4px;letter-spacing:.06em}
+.fx button.hold{background:var(--acc);border-color:var(--acc);color:#0a0a0b} .fx button.hold small{color:#3a2412}
+.knobs{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.knob{display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--dim);font-size:10px;touch-action:none;cursor:ns-resize}
+.knob .k{width:48px;height:48px;border-radius:50%;border:1px solid var(--fg);display:flex;align-items:center;justify-content:center;color:var(--fg);font-size:12px;letter-spacing:.02em;position:relative;background:var(--bg)}
+.knob .k::before{content:"";position:absolute;inset:-5px;border-radius:50%;border:1px solid transparent;border-top-color:var(--acc);transform:rotate(var(--rot,0deg))}
+.knob.acc .k{border-color:var(--acc);color:var(--acc)}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+button,select{font:inherit;letter-spacing:.08em;text-transform:uppercase;color:var(--fg);background:transparent;border:1px solid var(--line);border-radius:4px;padding:12px 14px;cursor:pointer;line-height:1.1;min-height:44px}
+button.primary{border-color:var(--acc);color:var(--acc)} button.on{background:var(--acc);border-color:var(--acc);color:#0a0a0b} button.big{flex:1;font-size:13px}
+button:focus-visible,select:focus-visible{outline:1px solid var(--acc);outline-offset:2px}
+.lbl{color:var(--dim);font-size:11px} .kn{display:flex;align-items:center;gap:8px;flex:1 1 150px;color:var(--dim);font-size:11px} .kn span{min-width:5.5em}
+input[type=range]{flex:1;min-width:60px;accent-color:var(--acc);height:28px;margin:0}
+#toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);transform:translateX(-50%);background:var(--fg);color:var(--bg);font-size:11px;padding:8px 14px;border-radius:4px;max-width:92%;text-align:center;opacity:0;transition:opacity .25s;pointer-events:none;text-transform:none;letter-spacing:.04em;z-index:9}
+#toast.show{opacity:1}
+.foot{display:flex;justify-content:space-between;color:var(--dim);font-size:10px;border-top:1px solid var(--line);padding-top:6px} .foot b{color:var(--acc);font-weight:500}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div id="app">
+  <div class="top"><span class="t">雲</span>
+    <div class="tabs"><span class="on" data-tab="play">Play</span><span data-tab="sound">Sound</span><span data-tab="out">Out</span></div>
+    <span class="r"><b id="r-key">C MIN</b> · <b id="r-dens">0.0</b>/s · <b id="r-t">00:00</b></span></div>
+  <canvas id="spec"></canvas>
+
+  <section class="pane on" data-pane="play">
+    <canvas id="pad"></canvas>
+    <div class="padcap"><span>← Grid · Chaos →</span><span id="r-breath">Breath 30%</span><span>↑ dense / loud</span></div>
+    <div class="fx">
+      <button data-fx="st16">Stutter<small>1/16</small></button>
+      <button data-fx="st32">Ratchet<small>1/32</small></button>
+      <button data-fx="stop">Tape stop<small>pitch ↓</small></button>
+      <button data-fx="gate">Gate<small>chop 1/8</small></button>
+      <button data-fx="dive">Dive<small>filter ↓</small></button>
+      <button data-fx="crush">Crush<small>4 bit</small></button>
+    </div>
+    <div class="knobs">
+      <div class="knob" data-k="drone" data-min="0" data-max="100" data-v="60"><div class="k">60</div>Drone</div>
+      <div class="knob" data-k="dust" data-min="0" data-max="100" data-v="45"><div class="k">45</div>Dust</div>
+      <div class="knob" data-k="sub" data-min="0" data-max="100" data-v="55"><div class="k">55</div>Sub</div>
+      <div class="knob" data-k="ping" data-min="0" data-max="100" data-v="65"><div class="k">65</div>Tone</div>
+      <div class="knob acc" data-k="rev" data-min="0" data-max="100" data-v="55"><div class="k">55</div>Reverb</div>
+      <div class="knob" data-k="dark" data-min="0" data-max="100" data-v="70"><div class="k">70</div>Dark</div>
+    </div>
+    <div class="row"><button id="b-play" class="big primary">▶ Play</button><button id="b-auto" class="big">Auto breath</button><button id="b-key">Key</button></div>
+  </section>
+
+  <section class="pane" data-pane="sound">
+    <div class="row"><span class="lbl">Dust material</span><button id="b-rec">● Rec</button><button id="b-file">File</button><button id="b-synth">Synthetic</button><span id="smp-name" class="lbl" style="margin-left:auto">synthetic</span><input id="f-file" type="file" hidden></div>
+    <div class="row"><label class="kn"><span>BPM grid</span><input id="k-bpm" type="range" min="80" max="150" step="1" value="120"></label><label class="kn"><span>Ratchet</span><input id="k-ratchet" type="range" min="0" max="1" step="0.01" value="0.35"></label></div>
+    <div class="row"><label class="kn"><span>Drift</span><input id="k-drift" type="range" min="0" max="1" step="0.01" value="0.5"></label><label class="kn"><span>Tape</span><input id="k-tape" type="range" min="0" max="1" step="0.01" value="0.5"></label></div>
+    <div class="lbl" style="text-transform:none">Rec / File で入れた音は、クリックの素材(10〜60msの粒)になります。Drift はドローンの音が勝手にずれる頻度。</div>
+  </section>
+
+  <section class="pane" data-pane="out">
+    <div class="row"><span class="lbl">Perform &amp; record</span><button id="x30">30s</button><button id="x60">60s</button></div>
+    <div class="row"><span class="lbl">Story (auto breath + FX)</span><button id="s30" class="primary">30s</button><button id="s60" class="primary">60s</button><span id="x-status" class="lbl" style="margin-left:auto"></span></div>
+    <div class="lbl" style="text-transform:none">Story: 呼吸を3つの山で自動的に動かし、山の頂上でラチェット、谷でダイブやテープ停止を勝手に入れます。録音しながら手で重ねてもOK。</div>
+  </section>
+  <div class="foot"><span>DRAG PAD <b>BREATHE</b> · HOLD KEY <b>BREAK</b></span><span id="dsp">DSP 00%</span></div>
+</div>
+<div id="toast"></div>
+
+<script>
+(()=>{
+const $=s=>document.querySelector(s), css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+let toastT; const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600);};
+document.querySelectorAll('.tabs span').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tabs span').forEach(x=>x.classList.toggle('on',x===t));document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===t.dataset.tab));});
+const KEYS=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; let key=0;
+const P={drone:60,dust:45,sub:55,ping:65,rev:55,dark:70};
+let breath=0.3, chaos=0.35, auto=false, playing=false, sample=null, t0=0;
+const hz=m=>440*Math.pow(2,(m-69)/12), root=()=>48+key; // C3
+
+/* ---------- audio graph ---------- */
+let ac=null, M=null, an=null, noiseB=null;
+function ensureAudio(){ if(ac){ if(ac.state!=='running') ac.resume(); return ac; }
+  ac=new (window.AudioContext||window.webkitAudioContext)(); noiseB=mkNoise(1);
+  const sum=ac.createGain();
+  // stutter: everything passes through a short delay line; holding a key closes the input and loops the line
+  const stIn=ac.createGain(), stD=ac.createDelay(1), stFb=ac.createGain(); stD.delayTime.value=0.125; stFb.gain.value=0;
+  const crush=ac.createWaveShaper(); crush.curve=lin(); crush.oversample='none';
+  const gate=ac.createGain();
+  const lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.Q.value=0.7;
+  const hp=ac.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=26;
+  const wow=ac.createDelay(0.05); wow.delayTime.value=0.006; const lfo=ac.createOscillator(); lfo.frequency.value=0.4; const lfoG=ac.createGain(); lfoG.gain.value=0.0008; lfo.connect(lfoG).connect(wow.delayTime); lfo.start();
+  const sat=ac.createWaveShaper(); sat.oversample='2x'; sat.curve=satCurve(0.2);
+  const rev=ac.createConvolver(); rev.buffer=mkIR(5); const revIn=ac.createGain(), revG=ac.createGain(); revG.gain.value=0.6;
+  const hiss=ac.createBufferSource(); hiss.buffer=mkNoise(4,true); hiss.loop=true; const hissG=ac.createGain(); hissG.gain.value=0.02; hiss.start();
+  const comp=ac.createDynamicsCompressor(); comp.threshold.value=-16; comp.ratio.value=3.5; comp.knee.value=10; comp.attack.value=0.004; comp.release.value=0.25;
+  const out=ac.createGain(); out.gain.value=0.85; const tap=ac.createMediaStreamDestination(); an=ac.createAnalyser(); an.fftSize=2048; an.smoothingTimeConstant=0.5;
+  sum.connect(stIn).connect(stD); stD.connect(stFb).connect(stD); stD.connect(crush).connect(gate).connect(lp).connect(hp).connect(wow).connect(sat).connect(comp).connect(out);
+  revIn.connect(rev); rev.connect(revG).connect(stIn); hiss.connect(hissG).connect(comp); out.connect(ac.destination); out.connect(tap); out.connect(an);
+  M={sum,stIn,stD,stFb,crush,gate,lp,hp,lfoG,sat,revIn,revG,hissG,out,tap}; startDrone(); applyKnobs(); return ac; }
+function mkNoise(sec,pink){ const n=Math.floor(ac.sampleRate*sec), b=ac.createBuffer(1,n,ac.sampleRate), d=b.getChannelData(0); let l=0; for(let i=0;i<n;i++){const w=Math.random()*2-1; if(pink){l=0.94*l+0.06*w; d[i]=(w*0.2+l)*0.5;} else d[i]=w;} return b; }
+function mkIR(sec){ const n=Math.floor(ac.sampleRate*sec), b=ac.createBuffer(2,n,ac.sampleRate); for(let c=0;c<2;c++){const d=b.getChannelData(c);let l=0;for(let i=0;i<n;i++){const w=Math.random()*2-1;l=0.82*l+0.18*w;d[i]=l*Math.pow(1-i/n,3.4)*1.4;}} return b; }
+function satCurve(a){ const n=1024,c=new Float32Array(n),k=a*20+1; for(let i=0;i<n;i++){const x=i*2/n-1;c[i]=(1+k)*x/(1+k*Math.abs(x));} return c; }
+function lin(){ const c=new Float32Array(3); c[0]=-1;c[1]=0;c[2]=1; return c; }
+function crushCurve(bits){ const n=4096,c=new Float32Array(n),L=Math.pow(2,bits); for(let i=0;i<n;i++){const x=i*2/n-1;c[i]=Math.round(x*L)/L;} return c; }
+function pan(x){ const p=ac.createStereoPanner?ac.createStereoPanner():ac.createGain(); if(p.pan) p.pan.value=x; p.connect(M.sum); return p; }
+function applyKnobs(){ if(!M) return; const t=ac.currentTime; M.revG.gain.setTargetAtTime(Math.pow(P.rev/100,1.2)*1.3,t,0.1); droneG.gain.setTargetAtTime(P.drone/100*0.5,t,0.1); M.sat.curve=satCurve(0.1+ +$('#k-tape').value*0.5); M.lfoG.gain.setTargetAtTime(+$('#k-tape').value*0.0015,t,0.1); setFilter(); }
+function setFilter(){ if(M) M.hissG.gain.setTargetAtTime((+$('#k-tape').value*0.03+0.012)*(0.4+breath*1.2),ac.currentTime,0.3); if(!M||fx.dive) return; const b=Math.max(0,breath); const base=Math.exp(Math.log(6000)+(Math.log(700)-Math.log(6000))*(P.dark/100)); M.lp.frequency.setTargetAtTime(base*(0.5+b*1.2),ac.currentTime,0.15); }
+
+/* ---------- drone: C minor add9 partials, slow drift ---------- */
+let droneG=null, droneV=[], droneOsc=[];
+function startDrone(){ droneG=ac.createGain(); droneG.gain.value=0; const dlp=ac.createBiquadFilter(); dlp.type='lowpass'; dlp.frequency.value=1800; droneG.connect(dlp).connect(M.sum); const r=ac.createGain(); r.gain.value=0.5; dlp.connect(r).connect(M.revIn);
+  const tones=[[-12,'sine',0.5],[0,'triangle',0.35],[7,'triangle',0.22],[12,'sine',0.16],[14,'sine',0.1],[15,'triangle',0.08],[19,'sine',0.07],[24,'sine',0.05]];
+  droneV=tones.map(([semi,type,g],i)=>{ const o=ac.createOscillator(); o.type=type; o.frequency.value=hz(root()+semi); const gg=ac.createGain(); gg.gain.value=g; const lfo=ac.createOscillator(); lfo.frequency.value=0.05+Math.random()*0.12; const lg=ac.createGain(); lg.gain.value=g*0.45; lfo.connect(lg).connect(gg.gain); lfo.start();
+    const det=ac.createOscillator(); det.frequency.value=0.03+Math.random()*0.08; const dg=ac.createGain(); dg.gain.value=4+i*1.5; det.connect(dg).connect(o.detune); det.start(); const pn=ac.createStereoPanner?ac.createStereoPanner():ac.createGain(); if(pn.pan) pn.pan.value=((i%2)?1:-1)*i*0.09; o.connect(gg).connect(pn).connect(droneG); o.start(); droneOsc.push(o); return {o,semi,gg}; }); }
+function retune(){ droneV.forEach(v=>v.o.frequency.setTargetAtTime(hz(root()+v.semi),ac.currentTime,0.8)); $('#r-key').textContent=KEYS[key]+' MIN'; }
+function drift(){ // the drone slips: one voice moves to a neighbouring chord tone for a while
+  const v=droneV[2+Math.floor(Math.random()*4)]; const alt=[[7,5],[7,8],[12,10],[14,15],[15,17],[19,20]].find(x=>x[0]===v.semi); if(!alt) return;
+  v.o.frequency.setTargetAtTime(hz(root()+alt[1]),ac.currentTime,2.5); setTimeout(()=>v.o.frequency.setTargetAtTime(hz(root()+v.semi),ac.currentTime,3),6000+Math.random()*8000); }
+
+/* ---------- dust: stochastic clicks on a loose grid ---------- */
+const bpm=()=>+$('#k-bpm').value, six=()=>60/bpm()/4;
+let nextSlot=0, slot=0, timer=null, rate=0, recent=[];
+function tick(){ const ahead=0.18; while(nextSlot<ac.currentTime+ahead){ scheduleSlot(slot,nextSlot); nextSlot+=six(); slot++; } toneProcess(); windProcess(); }
+function scheduleSlot(i,t){ const b=breath, D=P.dust/100, d=six();
+  // expected clicks per 16th: valley ≈ 0.2/s, peak ≈ 6/s  (measured 1–5/s)
+  const perSec=0.2+Math.pow(b,1.6)*7*D, lam=perSec*d; let n=0; let L=Math.exp(-lam), p=Math.random(); while(p>L){ n++; p*=Math.random(); }
+  for(let k=0;k<n;k++){ const snap=Math.random()>chaos; const tt=t+(snap?0:Math.random()*d)+(Math.random()-0.5)*0.004*chaos*10; const kind=pickKind(b); click(kind,tt,0.4+Math.random()*0.6*(0.4+b)); recent.push(tt);
+    if(Math.random()< +$('#k-ratchet').value*(0.05+b*0.6)){ const reps=3+Math.floor(Math.random()*3), iv=Math.random()<0.7?d/2:d/4; for(let r=1;r<=reps;r++) click(r===reps?'ツッ':'ツ',tt+iv*r,0.9*Math.pow(0.8,r)); } }
+  // sub pulse: on half notes mostly, drops out in the valleys
+  if(i%8===0 && Math.random()<(b<0.12?0:0.35+b*0.6)) thump(t+(Math.random()<chaos*0.5?d:0),0.6+b*0.4);
+  if(i%8===4 && Math.random()<b*0.25*chaos) thump(t,0.5);
+  // pings: tonal blips on drone harmonics
+  if(i%64===0 && Math.random()< +$('#k-drift').value*0.6) drift();
+  if(fx.gate){ const g=M.gate.gain; g.setValueAtTime(i%2===0?1:0.02,t); } }
+/* ---------- the noise vocabulary: each onomatopoeia is its own sound ---------- */
+const VOCAB=[ // name, weight at valley, weight at peak
+  ['ツ',3,2],['ツッ',2,3],['プツッ',2,1.5],['スツッ',1.5,1],['ザッ',0.6,2],['ザー',0.4,1.5],['ザザー',0.2,1.6],['ツー',0.8,1],['ピチー',0.5,1.3] ];
+const words=[]; function say(w,pan,t){ words.push({w,pan,t:t||ac.currentTime}); if(words.length>14) words.shift(); }
+function pickKind(b){ if(sample&&Math.random()<0.4) return 'grain'; let tot=0; const ws=VOCAB.map(([n,v,p])=>{ const w=v+(p-v)*b; tot+=w; return w; }); let r=Math.random()*tot; for(let i=0;i<VOCAB.length;i++){ r-=ws[i]; if(r<=0) return VOCAB[i][0]; } return 'ツ'; }
+function noise(t,{hp,bp,q,len,gain,am,pan:pn,rev,fadeIn}){ const n=ac.createBufferSource(); n.buffer=noiseB; n.loop=true; const f=ac.createBiquadFilter(); if(bp){ f.type='bandpass'; f.frequency.value=bp; f.Q.value=q||1; } else { f.type='highpass'; f.frequency.value=hp||1000; }
+  const g=ac.createGain(); const lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=6500; const out=pan(pn);
+  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+(fadeIn||0.002)); g.gain.exponentialRampToValueAtTime(0.0001,t+len);
+  n.connect(f).connect(lp).connect(g).connect(out); if(am){ const l=ac.createOscillator(); l.type='square'; l.frequency.value=am; const lg=ac.createGain(); lg.gain.value=0.5; const off=ac.createGain(); off.gain.value=0.5; l.connect(lg).connect(off.gain); g.connect(off); off.connect(out); g.disconnect(out); l.start(t); l.stop(t+len+0.05); }
+  if(rev){ const r=ac.createGain(); r.gain.value=rev; g.connect(r).connect(M.revIn); } n.start(t,Math.random()*0.9); n.stop(t+len+0.05); }
+function click(kind,t,v){ const D=P.dust/100*0.9, pn=(Math.random()-0.5)*1.5, a=v*D;
+  if(kind==='thump') return thump(t,v*0.6);
+  if(kind==='grain'){ const len=0.012+Math.random()*0.05, src=ac.createBufferSource(); src.buffer=sample; src.playbackRate.value=Math.pow(2,(Math.random()<0.5?0:[-12,12,7,-5][Math.floor(Math.random()*4)])/12); const g=ac.createGain(); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(a*1.1,t+0.002); g.gain.exponentialRampToValueAtTime(0.0001,t+len); const f=ac.createBiquadFilter(); f.type='lowpass'; f.frequency.value=3500; src.connect(f).connect(g).connect(pan(pn)); const r=ac.createGain(); r.gain.value=0.3; g.connect(r).connect(M.revIn); src.start(t,Math.random()*(sample.duration-0.1),len+0.01); say('粒',pn,t); return; }
+  say(kind,pn,t);
+  if(kind==='ツ')    noise(t,{hp:2500+Math.random()*2500,len:0.003+Math.random()*0.003,gain:a*0.45,pan:pn});
+  if(kind==='ツッ')  noise(t,{hp:1500+Math.random()*2000,len:0.008+Math.random()*0.008,gain:a*0.6,pan:pn,rev:0.15});
+  if(kind==='プツッ'){ noise(t,{bp:250+Math.random()*450,q:1.5,len:0.012,gain:a*0.9,pan:pn}); noise(t+0.004,{hp:2000,len:0.004,gain:a*0.3,pan:pn}); }
+  if(kind==='スツッ'){ noise(t,{hp:3000,len:0.05,gain:a*0.12,pan:pn,fadeIn:0.03}); noise(t+0.05,{hp:1800,len:0.008,gain:a*0.5,pan:pn}); }
+  if(kind==='ザッ')  noise(t,{bp:1200+Math.random()*1500,q:0.7,len:0.06+Math.random()*0.07,gain:a*0.35,pan:pn,rev:0.25});
+  if(kind==='ザー')  noise(t,{bp:900+Math.random()*1200,q:0.6,len:0.35+Math.random()*0.5,gain:a*0.22,pan:pn,rev:0.35,fadeIn:0.04});
+  if(kind==='ザザー') noise(t,{bp:1000+Math.random()*1500,q:0.8,len:0.5+Math.random()*0.7,gain:a*0.26,am:14+Math.random()*22,pan:pn,rev:0.4,fadeIn:0.02});
+  if(kind==='ツー')  noise(t,{bp:2200+Math.random()*2500,q:14,len:0.35+Math.random()*0.9,gain:a*0.5,pan:pn,rev:0.6,fadeIn:0.06});
+  if(kind==='ピチー'){ const o=ac.createOscillator(), g=ac.createGain(); o.type='sine'; const f0=1400+Math.random()*1200, len=0.15+Math.random()*0.25; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f0*(1.8+Math.random()*1.2),t+len*0.7); o.frequency.exponentialRampToValueAtTime(f0*2.2,t+len);
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(a*0.18,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+len); o.connect(g).connect(pan(pn)); const r=ac.createGain(); r.gain.value=1.2; g.connect(r).connect(M.revIn); o.start(t); o.stop(t+len+0.05); } }
+function thump(t,v){ const o=ac.createOscillator(), g=ac.createGain(); o.type='sine'; o.frequency.setValueAtTime(95,t); o.frequency.exponentialRampToValueAtTime(40,t+0.09); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(v*P.sub/100*0.9,t+0.005); g.gain.exponentialRampToValueAtTime(0.0001,t+0.3); o.connect(g).connect(M.sum); o.start(t); o.stop(t+0.35); }
+const PENTA=[0,3,5,7,10,12,15,17,19,22,24]; let lastTone=-1, nextTone=0;
+function tone(t){ let i; do{ i=Math.floor(Math.random()*PENTA.length); }while(i===lastTone); lastTone=i; const f=hz(root()+12+PENTA[i]), v=P.ping/100*0.32*(0.6+Math.random()*0.4), dur=1.6+Math.random()*2.2, out=pan((Math.random()-0.5)*1.6);
+  const g=ac.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(v,t+0.012); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  const mk=(mul,gain,det,dec)=>{ const o=ac.createOscillator(); o.type='sine'; o.frequency.value=f*mul; o.detune.value=det; const gg=ac.createGain(); gg.gain.setValueAtTime(gain,t); if(dec) gg.gain.setTargetAtTime(0.0001,t+0.02,dec); o.connect(gg).connect(g); o.start(t); o.stop(t+dur+0.1); };
+  mk(1,1,0,0); mk(1,0.5,6,0); mk(2,0.28,-3,0.5); mk(3,0.1,2,0.25); mk(4.2,0.05,0,0.12);     // soft bell: fundamental + fading upper partials
+  g.connect(out); const r=ac.createGain(); r.gain.value=1.4; g.connect(r).connect(M.revIn); recent.push(t);
+  if(Math.random()<0.18) setTimeout(()=>tone(ac.currentTime+0.001),120+Math.random()*180);   // occasional grace-note pair
+}
+function toneProcess(){ // free time, independent of the grid: one tone every 0.5–6 s depending on breath
+  const ahead=0.2; while(nextTone<ac.currentTime+ahead){ if(nextTone>0&&playing) tone(Math.max(nextTone,ac.currentTime+0.01)); const rate=(0.15+Math.pow(breath,1.3)*1.6)*(P.ping/100+0.2); nextTone=Math.max(nextTone,ac.currentTime)+ -Math.log(1-Math.random())/rate; } }
+let windNext=0; function windProcess(){ const ahead=0.2; while(windNext<ac.currentTime+ahead){ if(windNext>0&&playing) wind(Math.max(windNext,ac.currentTime+0.01)); windNext=Math.max(windNext,ac.currentTime)+6+Math.random()*12; } }
+function wind(t){ const n=ac.createBufferSource(); n.buffer=noiseB; n.loop=true; const f=ac.createBiquadFilter(); f.type='bandpass'; f.Q.value=1.2; const dur=3+Math.random()*4, f0=300+Math.random()*900; f.frequency.setValueAtTime(f0,t); f.frequency.linearRampToValueAtTime(f0*(0.5+Math.random()),t+dur);
+  const g=ac.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.05+breath*0.07,t+dur*0.5); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); n.connect(f).connect(g).connect(pan((Math.random()-0.5)*1.2)); const r=ac.createGain(); r.gain.value=0.8; g.connect(r).connect(M.revIn); n.start(t); n.stop(t+dur+0.1); }
+
+/* ---------- FX keys (hold) ---------- */
+const fx={st16:false,st32:false,stop:false,gate:false,dive:false,crush:false};
+function fxOn(k){ ensureAudio(); const t=ac.currentTime; fx[k]=true;
+  if(k==='st16'||k==='st32'){ M.stD.delayTime.setValueAtTime(k==='st16'?six():six()/2,t); M.stFb.gain.setTargetAtTime(1,t,0.005); M.stIn.gain.setTargetAtTime(0,t,0.005); }
+  if(k==='stop'){ droneOsc.forEach(o=>{ o.detune.cancelScheduledValues(t); o.detune.setTargetAtTime(-2400,t,0.45); }); M.lp.frequency.setTargetAtTime(220,t,0.5); stopHeld=true; }
+  if(k==='gate'){ /* scheduled per slot */ }
+  if(k==='dive'){ M.lp.frequency.cancelScheduledValues(t); M.lp.frequency.setTargetAtTime(140,t,0.25); }
+  if(k==='crush'){ M.crush.curve=crushCurve(3.5); } }
+function fxOff(k){ if(!M) return; const t=ac.currentTime; fx[k]=false;
+  if(k==='st16'||k==='st32'){ if(!fx.st16&&!fx.st32){ M.stFb.gain.setTargetAtTime(0,t,0.01); M.stIn.gain.setTargetAtTime(1,t,0.01); } else { M.stD.delayTime.setValueAtTime(fx.st16?six():six()/2,t); } }
+  if(k==='stop'){ droneOsc.forEach(o=>o.detune.setTargetAtTime(0,t,0.12)); stopHeld=false; setFilter(); }
+  if(k==='gate'){ M.gate.gain.cancelScheduledValues(t); M.gate.gain.setValueAtTime(1,t); }
+  if(k==='dive'){ setFilter(); }
+  if(k==='crush'){ M.crush.curve=lin(); } }
+let stopHeld=false;
+document.querySelectorAll('.fx button').forEach(b=>{ const k=b.dataset.fx; const dn=e=>{ b.setPointerCapture?.(e.pointerId); b.classList.add('hold'); fxOn(k); }; const up=()=>{ b.classList.remove('hold'); fxOff(k); };
+  b.addEventListener('pointerdown',dn); b.addEventListener('pointerup',up); b.addEventListener('pointercancel',up); b.addEventListener('pointerleave',e=>{ if(b.classList.contains('hold')&&!(e.buttons&1)) up(); }); });
+
+/* ---------- breath pad ---------- */
+const pad=$('#pad'), pg=pad.getContext('2d'); let PW=0,PH=0; const trail=[];
+function padResize(){ const r=pad.getBoundingClientRect(); const d=Math.min(2,devicePixelRatio||1); PW=r.width;PH=r.height; pad.width=PW*d; pad.height=PH*d; pg.setTransform(d,0,0,d,0,0); } new ResizeObserver(padResize).observe(pad); padResize();
+let padDown=false; function padSet(e){ const r=pad.getBoundingClientRect(); chaos=Math.min(1,Math.max(0,(e.clientX-r.left)/PW)); breath=Math.min(1,Math.max(0,1-(e.clientY-r.top)/PH)); }
+pad.addEventListener('pointerdown',e=>{ ensureAudio(); pad.setPointerCapture(e.pointerId); padDown=true; auto=false; $('#b-auto').classList.remove('on'); padSet(e); });
+pad.addEventListener('pointermove',e=>{ if(padDown) padSet(e); }); const padUp=()=>padDown=false; pad.addEventListener('pointerup',padUp); pad.addEventListener('pointercancel',padUp);
+let autoT=0; function autoBreath(dt){ autoT+=dt; const b=0.5+0.42*Math.sin(autoT*2*Math.PI/11)+0.18*Math.sin(autoT*2*Math.PI/4.3+1); breath=Math.min(1,Math.max(0,(b-0.1)*0.95)); chaos=0.35+0.3*Math.sin(autoT*2*Math.PI/23); }
+$('#b-auto').onclick=()=>{ ensureAudio(); auto=!auto; $('#b-auto').classList.toggle('on',auto); };
+$('#b-key').onclick=()=>{ ensureAudio(); key=(key+[5,7,2,10,3][Math.floor(Math.random()*5)])%12; retune(); toast('Key '+KEYS[key]+' minor'); };
+
+/* ---------- spectrogram (scrolling) ---------- */
+const sp=$('#spec'), sg=sp.getContext('2d'); let SW=0,SH=0; function spResize(){ const r=sp.getBoundingClientRect(); const d=Math.min(2,devicePixelRatio||1); SW=r.width;SH=r.height; sp.width=SW*d; sp.height=SH*d; sg.setTransform(d,0,0,d,0,0); } new ResizeObserver(spResize).observe(sp); spResize();
+const fdata=new Uint8Array(1024), fdataF=new Float32Array(1024); let lastF=0;
+function frame(now){ requestAnimationFrame(frame); const dt=Math.min(0.05,(now-lastF)/1000)||0.016; lastF=now; if(auto&&playing) autoBreath(dt); if(playing&&!stopHeld) setFilter();
+  // spectrogram: shift left, draw a new column (0–5 kHz, log-ish)
+  if(an&&playing){ an.getFloatFrequencyData(fdataF); const d=Math.min(2,devicePixelRatio||1); sg.drawImage(sp,2*d,0,sp.width-2*d,sp.height,0,0,SW-2,SH); sg.fillStyle=css('--bg'); sg.fillRect(SW-2,0,2,SH); const nyq=ac.sampleRate/2, binHz=nyq/1024;
+    for(let y=0;y<SH;y++){ const fr=50*Math.pow(100,1-y/SH); const bin=Math.min(1023,Math.floor(fr/binHz)); const v=Math.min(1,Math.max(0,(fdataF[bin]+78)/50)); if(v<0.1) continue; const a=Math.pow(v,2.6); sg.fillStyle=v>0.85?`rgba(255,236,214,${a})`:`rgba(255,122,26,${a})`; sg.fillRect(SW-2,y,2,1); } }
+  else if(!playing){ sg.fillStyle='rgba(10,10,11,0.08)'; sg.fillRect(0,0,SW,SH); }
+  // pad
+  pg.clearRect(0,0,PW,PH); pg.fillStyle=css('--line'); for(let x=12;x<PW;x+=14) for(let y=10;y<PH;y+=14){ pg.beginPath(); pg.arc(x,y,0.8,0,6.283); pg.fill(); }
+  trail.push([chaos,breath]); if(trail.length>160) trail.shift(); pg.strokeStyle=css('--acc'); pg.globalAlpha=0.35; pg.lineWidth=1; pg.beginPath(); trail.forEach(([c,b],i)=>{ const x=PW-(trail.length-i)*(PW/160), y=PH-b*PH; i?pg.lineTo(x,y):pg.moveTo(x,y); }); pg.stroke(); pg.globalAlpha=1;
+  const px=chaos*PW, py=PH-breath*PH; pg.strokeStyle=css('--dim'); pg.setLineDash([2,4]); pg.beginPath(); pg.moveTo(px,0); pg.lineTo(px,PH); pg.moveTo(0,py); pg.lineTo(PW,py); pg.stroke(); pg.setLineDash([]);
+  pg.fillStyle=css('--acc'); pg.beginPath(); pg.arc(px,py,6,0,6.283); pg.fill(); pg.strokeStyle=css('--acc'); pg.globalAlpha=0.4; pg.beginPath(); pg.arc(px,py,12+breath*10,0,6.283); pg.stroke(); pg.globalAlpha=1;
+  $('#r-breath').textContent='Breath '+Math.round(breath*100)+'%';
+  if(ac){ const nowA=ac.currentTime; while(recent.length&&recent[0]<nowA-4) recent.shift(); $('#r-dens').textContent=(recent.filter(t=>t<=nowA).length/4).toFixed(1); const el=Math.max(0,nowA-t0); $('#r-t').textContent=String(Math.floor(el/60)).padStart(2,'0')+':'+String(Math.floor(el%60)).padStart(2,'0'); }
+  $('#dsp').textContent='DSP '+String(Math.min(99,18+Math.round(breath*40+P.rev*0.2))).padStart(2,'0')+'%'; }
+requestAnimationFrame(frame);
+
+/* knobs */
+document.querySelectorAll('.knob').forEach(el=>{ const k=el.dataset.k, mn=+el.dataset.min, mx=+el.dataset.max; const show=()=>{ el.querySelector('.k').textContent=P[k]; el.style.setProperty('--rot',(-135+270*(P[k]-mn)/(mx-mn))+'deg'); }; show();
+  let y0=0,v0=0; el.addEventListener('pointerdown',e=>{ ensureAudio(); el.setPointerCapture(e.pointerId); y0=e.clientY; v0=P[k]; }); el.addEventListener('pointermove',e=>{ if(!(e.buttons&1)) return; let v=Math.round(v0+(y0-e.clientY)/140*(mx-mn)); v=Math.min(mx,Math.max(mn,v)); if(v!==P[k]){ P[k]=v; show(); applyKnobs(); } }); });
+['#k-tape','#k-bpm'].forEach(id=>$(id).oninput=()=>applyKnobs());
+
+/* transport */
+function play(on){ ensureAudio(); playing=on; $('#b-play').textContent=on?'■ Stop':'▶ Play'; $('#b-play').classList.toggle('on',on); clearInterval(timer); const t=ac.currentTime;
+  if(on){ t0=t; slot=0; nextSlot=t+0.05; nextTone=t+1.5; windNext=t+3; timer=setInterval(tick,30); droneG.gain.setTargetAtTime(P.drone/100*0.5,t,1.5); } else { droneG.gain.setTargetAtTime(0,t,0.6); } }
+$('#b-play').onclick=()=>play(!playing);
+
+/* dust material */
+$('#b-synth').onclick=()=>{ sample=null; $('#smp-name').textContent='synthetic'; toast('Synthetic clicks'); };
+$('#b-file').onclick=()=>{ensureAudio();$('#f-file').click();};
+$('#f-file').onchange=async e=>{ const f=e.target.files[0]; if(!f) return; e.target.value=''; try{ sample=await ac.decodeAudioData(await f.arrayBuffer()); $('#smp-name').textContent=f.name.slice(0,16); toast('Dust material loaded'); }catch(err){ toast('この形式は読み込めませんでした'); } };
+let rec=null, chunks=[];
+$('#b-rec').onclick=async()=>{ ensureAudio(); if(rec){ rec.stop(); return; } if(!navigator.mediaDevices?.getUserMedia){ toast('マイクが使えない環境です'); return; }
+  try{ const st=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}}); chunks=[]; rec=new MediaRecorder(st); rec.ondataavailable=ev=>{if(ev.data.size)chunks.push(ev.data);};
+    rec.onstop=async()=>{ st.getTracks().forEach(x=>x.stop()); const blob=new Blob(chunks,{type:rec.mimeType}); rec=null; $('#b-rec').classList.remove('on'); $('#b-rec').textContent='● Rec'; try{ sample=await ac.decodeAudioData(await blob.arrayBuffer()); $('#smp-name').textContent='mic'; toast('Recorded → dust'); }catch(e){ toast('録音を読み込めませんでした'); } };
+    rec.start(); $('#b-rec').classList.add('on'); $('#b-rec').textContent='■ Stop'; }catch(e){ toast('マイクが許可されませんでした'); } };
+
+/* record out & story */
+let dl=null; (async()=>{ try{ dl=await (window.claude?.use?.('downloads')); }catch(e){} })();
+function exportSec(sec){ ensureAudio(); if(!window.MediaRecorder){toast('この環境では書き出せません');return;} if(!playing) play(true);
+  const mime=['audio/mp4','audio/webm;codecs=opus','audio/webm'].find(m=>MediaRecorder.isTypeSupported(m))||''; const r=new MediaRecorder(M.tap.stream,mime?{mimeType:mime}:undefined), ch=[]; r.ondataavailable=e=>{if(e.data.size)ch.push(e.data);};
+  const stt=$('#x-status'); let left=sec; stt.textContent='REC '+left; const iv=setInterval(()=>{left--;stt.textContent='REC '+left;},1000);
+  r.onstop=async()=>{ clearInterval(iv); stt.textContent=''; const ext=(r.mimeType||mime).includes('mp4')?'mp4':'webm'; const blob=new Blob(ch,{type:r.mimeType||mime}), name=`cloud-${sec}s.${ext}`;
+    if(dl){ try{ await dl.save({filename:name,data:blob}); toast('Saved'); }catch(e){ if(e&&e.code!=='declined') toast('保存できませんでした'); } } else { const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); toast('Saved'); } };
+  r.start(); setTimeout(()=>r.stop(),sec*1000+300); }
+$('#x30').onclick=()=>exportSec(30); $('#x60').onclick=()=>exportSec(60);
+function runStory(sec){ ensureAudio(); auto=false; $('#b-auto').classList.remove('on'); const T0=performance.now(); const peaks=[0.3,0.62,0.85];   // three swells, like the reference
+  const env=f=>{ let b=0.12; for(const p of peaks){ const w=0.11; b+=0.8*Math.exp(-Math.pow((f-p)/w,2)); } return Math.min(1,b*(f>0.95?(1-f)/0.05:1)); };
+  const tickS=()=>{ const f=(performance.now()-T0)/1000/sec; if(f>=1.02){ fxOff('st32'); fxOff('dive'); fxOff('stop'); return; } breath=env(f); chaos=0.3+0.4*Math.abs(Math.sin(f*9));
+    for(const p of peaks){ if(Math.abs(f-p)<0.004&&!storyFx){ storyFx=true; fxOn('st32'); setTimeout(()=>{fxOff('st32');storyFx=false;},260+Math.random()*300); } if(Math.abs(f-(p+0.09))<0.004&&!storyFx){ storyFx=true; fxOn('dive'); setTimeout(()=>{fxOff('dive');storyFx=false;},700); } }
+    if(Math.abs(f-0.985)<0.004&&!storyFx){ storyFx=true; fxOn('stop'); setTimeout(()=>{fxOff('stop');storyFx=false;},1500); }
+    requestAnimationFrame(tickS); };
+  requestAnimationFrame(tickS); exportSec(sec); toast('Story '+sec+'s'); }
+let storyFx=false;
+$('#s30').onclick=()=>runStory(30); $('#s60').onclick=()=>runStory(60);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&ac&&ac.state!=='running') ac.resume(); });
+})();
+</script>
+</body></html>
