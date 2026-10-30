@@ -373,6 +373,8 @@ function revHold(semi,v,pn,pp){ pp=pp||PP(); const t=ac.currentTime, f=hz(root()
   const nlp=ac.createBiquadFilter(); nlp.type='lowpass'; nlp.Q.value=0.8; nlp.frequency.setValueAtTime(500,t); nlp.frequency.exponentialRampToValueAtTime(2200+pp.tone*3500,t+rise); const tr=ac.createOscillator(); tr.frequency.value=8.5; const tg=ac.createGain(); tg.gain.value=0.22; const base=ac.createGain(); base.gain.value=0.78; tr.connect(tg).connect(base.gain); nlp.connect(base).connect(g); tr.start(t); const oscs=[tr];
   for(const [mul,gain,det] of [[1,1,-5],[1,1,5],[2,0.6,-5],[2,0.6,5],[3,0.45,0],[4,0.3,0],[5,0.2,0],[6,0.14,0],[7,0.1,0],[8,0.07,0]]){ const o=ac.createOscillator(); o.type='sine'; o.frequency.value=f*mul; o.detune.value=det+bend*100; const og=ac.createGain(); og.gain.value=gain; o.connect(og).connect(nlp); o.start(t); oscs.push(o); const e={o,det}; bendable.add(e); o.onended=()=>bendable.delete(e); }
   g.connect(out); revSend(g,1.2*pp.rev); return ()=>{ const tt=ac.currentTime; g.gain.cancelScheduledValues(tt); g.gain.setValueAtTime(g.gain.value,tt); g.gain.linearRampToValueAtTime(0,tt+0.012); oscs.forEach(o=>o.stop(tt+0.1)); }; }
+let popB=null; function popBuf(){ if(popB&&popB.sampleRate===ac.sampleRate) return popB; const sr=ac.sampleRate, n=Math.floor(sr*0.012), b=ac.createBuffer(1,n,sr), d=b.getChannelData(0); const w=sr*0.00032; for(let i=0;i<n;i++){ const t=i/sr; const bump=i<w?Math.sin(Math.PI*i/w):0; const under=-0.22*Math.exp(-(t-0.00035)/0.0009)*(t>0.00035?1:0); const tail=0.08*Math.sin(2*Math.PI*1100*t)*Math.exp(-t/0.002)+0.05*Math.sin(2*Math.PI*3400*t)*Math.exp(-t/0.0007); d[i]=bump+under+tail; } popB=b; return b; }
+function pop(v,pn,pp,at){ pp=pp||PP(); const t=at||ac.currentTime, src=ac.createBufferSource(); src.buffer=popBuf(); const g=ac.createGain(); g.gain.value=(0.05+v*0.3)*pp.level*(Math.random()<0.5?1:-1); const lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=3200+pp.tone*4000+v*2500; lp.Q.value=0.7; const out=gate(t,0.03,Object.assign({},pp,{glide:false,clean:true}),pn); src.connect(lp).connect(g).connect(out); revSend(g,0.12*pp.rev); src.start(t); }
 function noise(o,pp,at){ pp=pp||PP(); const t=at||ac.currentTime, n=ac.createBufferSource(); n.buffer=noiseB; n.loop=true; const f=ac.createBiquadFilter(), fm=Math.pow(2,pp.pitch/12)*(0.5+pp.tone); if(o.bp){ f.type='bandpass'; f.frequency.value=o.bp*fm; f.Q.value=o.q||1; } else { f.type='highpass'; f.frequency.value=(o.hp||1000)*fm; }
   const len=o.len*(o.hold?1:dec()*pp.decay), g=ac.createGain(), lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=7500; const out=gate(t,o.hold?2:len,pp,o.pan); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(o.gain*1.6*pp.level,t+(o.fadeIn||0.002)); if(!o.hold) g.gain.exponentialRampToValueAtTime(0.0001,t+len);
   let last=g; if(o.am){ const l=ac.createOscillator(); l.type='square'; l.frequency.value=o.am; const lg=ac.createGain(); lg.gain.value=0.5; const off=ac.createGain(); off.gain.value=0.5; l.connect(lg).connect(off.gain); g.connect(off); last=off; l.start(t); l.stop(t+(o.hold?60:len+0.05)); }
@@ -444,7 +446,7 @@ function padsFor(it){ if(it.kind==='p') return PENTA.slice(0,8).map(semi=>mk(KEY
     mk('ツ','tick',(v,pn,pp,at)=>noise({hp:3000,len:0.004,gain:0.4*v+0.1,pan:pn},pp,at)),
     mk('ツッ','click',(v,pn,pp,at)=>noise({hp:1800,len:0.012,gain:0.5*v+0.1,pan:pn,rev:0.2},pp,at)),
     mk('ツツツ','3連',(v,pn,pp,at)=>{ const t0=at||ac.currentTime; for(let k=0;k<3;k++) noise({hp:2500,len:0.006,gain:(0.5*v+0.1)*Math.pow(0.85,k),pan:pn,rev:0.15},pp,t0+k*0.045); }),
-    mk('プツッ','pop',(v,pn,pp,at)=>{noise({bp:300+v*300,q:1.5,len:0.012,gain:0.8*v+0.1,pan:pn},pp,at);noise({hp:2000,len:0.004,gain:0.25,pan:pn},pp,at);}),
+    mk('プツッ','pop',(v,pn,pp,at)=>pop(v,pn,pp,at)),
     mk('コツ','wood',(v,pn,pp,at)=>wood(170+v*300,v,pn,pp,at)),
     mk('コロ','wood low',(v,pn,pp,at)=>wood(110+v*120,v,pn,pp,at)),
     mk('チリ','dust',(v,pn,pp,at)=>{ const t0=at||ac.currentTime; for(let k=0;k<3;k++) noise({hp:5000,len:0.002,gain:0.18*(0.5+v),pan:pn+(Math.random()-0.5)*0.4},pp,t0+k*(0.006+Math.random()*0.02)); }),
@@ -539,7 +541,7 @@ function glNote(c,r,v,quick,drag){ const m=instr.mac, pn=(c-(GC-1)/2)/(GC-1)*1.4
   const pp=macPP(m,{voice:undefined}); const g=0.35+v*0.5; // noise palette: row = kind, column = variation
   switch(r){ case 0: noise({hp:1200+u*5000,len:0.003+u*0.004,gain:g*0.5,pan:pn},pp); break;
     case 1: { const n=2+Math.round(u*5), iv=0.028+(1-u)*0.03; for(let k=0;k<n;k++) noise({hp:2000+u*3000,len:0.006,gain:g*0.6*Math.pow(0.85,k),pan:pn,rev:0.15},pp,ac.currentTime+k*iv); break; }
-    case 2: noise({bp:180+u*700,q:1.5,len:0.012+u*0.01,gain:g*0.9,pan:pn},pp); noise({hp:2000,len:0.004,gain:0.25,pan:pn},pp); break;
+    case 2: pop(0.3+v*0.5,pn,Object.assign({},pp,{tone:u}),ac.currentTime); break;
     case 3: wood(170+u*380,v,pn,pp); break;   // コツ: small wooden tick
     case 4: { for(let k=0;k<2+Math.round(u*3);k++) noise({hp:4000+u*3000,len:0.002,gain:g*0.18,pan:pn+(Math.random()-0.5)*0.4},pp,ac.currentTime+k*(0.006+Math.random()*0.02)); break; }   // チリ: a few dust grains
     case 5: { let k=0, dt=0; const n=4+Math.floor(Math.random()*6); const acc=Math.random()<0.5; for(k=0;k<n;k++){ const r2=[0,0,1,2,3,4][Math.floor(Math.random()*6)]; const cc=Math.floor(Math.random()*GC); setTimeout(()=>glNote(cc,r2,0.5+Math.random()*0.4,true),dt); dt+=acc?30+k*k*8:160-k*14; } break; } } }
@@ -608,18 +610,19 @@ function drawGlide(){ if(!GW) glResize(); if(!GW||$('#glide').hidden) return; gg
 
 /* ---------- hold FX on the pad bus ---------- */
 const fx={st32:false,st16:false,rnd:false,dive:false,stop:false,crk:false}; let crkTimer=null, gateTimer=null;
-const FXL=[['st32','Ratchet','1/32 刻み'],['st16','Stutter','1/16 刻み'],['rnd','Shuffle','刻みランダム'],['dive','Dive','こもる'],['stop','Wobble','テープよれ'],['crk','接触不良','プツプツ']];
+const FXL=[['st32','Ratchet','1/32 刻み'],['st16','Stutter','1/16 刻み'],['rnd','Shuffle','刻みランダム'],['dive','Dive','こもる'],['stop','Wobble','テープよれ'],['crk','接触不良','パチパチ']];
 // rhythmic gate on the live bus (sound keeps ringing underneath; the gate just chops it)
 function gateStep(){ if(!(fx.st32||fx.st16||fx.rnd)||!M) return; const t=ac.currentTime, beat=60/P.rate; let div, duty=0.55;
   if(fx.rnd){ const r=Math.random(); div=r<0.35?8:r<0.75?4:2; duty=0.35+Math.random()*0.4; } else div=fx.st32?8:4;   // shuffle: 1/32, 1/16 and 1/8 mixed at random
   const per=beat/div, g=M.gateG.gain; g.cancelScheduledValues(t); g.setValueAtTime(g.value,t); g.linearRampToValueAtTime(1,t+0.003); g.setValueAtTime(1,t+per*duty); g.linearRampToValueAtTime(0.06,t+per*duty+0.005); gateTimer=setTimeout(gateStep,per*1000-3); }
-function crkStep(){ if(!fx.crk||!M) return; const t=ac.currentTime, g=M.crkG.gain; g.cancelScheduledValues(t); g.setValueAtTime(g.value,t); const R=0.003;
-  // a loose plug: mostly connected, brief cut-outs and the odd chatter burst
-  const r=Math.random(); let next;
-  if(r<0.62){ g.linearRampToValueAtTime(1,t+R); next=0.03+Math.random()*0.12; }
-  else if(r<0.9){ g.linearRampToValueAtTime(0.05,t+R); next=0.004+Math.random()*0.018; }
-  else { let tt=t; const n=3+Math.floor(Math.random()*6), iv=0.008+Math.random()*0.006; for(let k=0;k<n;k++){ g.linearRampToValueAtTime(k%2?0.05:1,tt+R); tt+=iv; g.setValueAtTime(k%2?0.05:1,tt); } g.linearRampToValueAtTime(1,tt+R); next=tt+R-t; }
-  crkTimer=setTimeout(crkStep,Math.max(3,next*1000-2)); }
+function crkStep(){ if(!fx.crk||!M) return; const t=ac.currentTime, beat=60/P.rate, pp=PP();
+  // modelled on the reference: ~3.5 groups/s; group of 1 (55%) 2 (17%) 3 (13%) or 4–8 pops; inside a group either a 1/32 ratchet (~64 ms) or a fast double (8–25 ms)
+  const r=Math.random(); const n=r<0.55?1:r<0.72?2:r<0.85?3:4+Math.floor(Math.random()*5); const ratchet=Math.random()<0.5; const iv=ratchet?beat/8*(0.93+Math.random()*0.14):0.008+Math.random()*0.017; const pn=(Math.random()-0.5)*0.5;
+  const base=Math.pow(10,-1.2+Math.random()*0.9);   // 0.06 … 0.5 — log-spread like the recording
+  for(let k=0;k<n;k++){ const v=Math.min(1,base*(k===0?1:0.6+Math.random()*0.6)); pop(v,pn+(Math.random()-0.5)*0.2,pp,t+0.004+k*iv); }
+  if(Math.random()<0.4){ const g=M.crkG.gain, d0=t+0.004+Math.random()*0.01, dep=0.7+Math.random()*0.18, len=0.02+Math.random()*0.03; g.cancelScheduledValues(t); g.setValueAtTime(g.value,t); g.linearRampToValueAtTime(dep,d0+0.003); g.setValueAtTime(dep,d0+len); g.linearRampToValueAtTime(1,d0+len+0.004); }   // a shallow 20–50 ms dip under some groups
+  const next=(0.08+Math.random()*0.45)+(n-1)*iv;   // groups ~3.5 per second
+  crkTimer=setTimeout(crkStep,next*1000); }
 function gainHome(g,t,ms){ g.cancelScheduledValues(t); g.setValueAtTime(g.value,t); g.linearRampToValueAtTime(1,t+(ms||0.01)); setTimeout(()=>{ if(!M) return; const tt=ac.currentTime; g.cancelScheduledValues(tt); g.setValueAtTime(1,tt); },(ms||0.01)*1000+60); }
 function fxOn(k){ ensureAudio(); const t=ac.currentTime; fx[k]=true;
   if(k==='crk'){ clearTimeout(crkTimer); crkStep(); return; }
