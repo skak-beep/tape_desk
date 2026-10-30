@@ -627,18 +627,18 @@ function gateStep(){ if(!(fx.st32||fx.st16||fx.rnd)||!M) return; const t=ac.curr
   if(fx.rnd){ const r=Math.random(); div=r<0.35?8:r<0.75?4:2; duty=0.35+Math.random()*0.4; } else div=fx.st32?8:4;   // shuffle: 1/32, 1/16 and 1/8 mixed at random
   const per=beat/div, g=M.gateG.gain; g.cancelScheduledValues(t); g.setValueAtTime(g.value,t); g.linearRampToValueAtTime(1,t+0.003); g.setValueAtTime(1,t+per*duty); g.linearRampToValueAtTime(0.06,t+per*duty+0.005); gateTimer=setTimeout(gateStep,per*1000-3); }
 function crkStep(){ if(!fx.crk||!M) return; const t=ac.currentTime, beat=60/P.rate, g=M.crkG.gain;
-  // the contact chatters without the pops: notches in groups (same timing family as the recording), breaks after rattles, shallow dips
-  const r=Math.random(); const n=r<0.55?1:r<0.72?2:r<0.85?3:4+Math.floor(Math.random()*5); const ratchet=Math.random()<0.5; const iv=ratchet?beat/8*(0.93+Math.random()*0.14):0.008+Math.random()*0.017;
-  const base=Math.pow(10,-1.2+Math.random()*0.9); g.cancelScheduledValues(t); g.setValueAtTime(g.value,t);
-  for(let k=0;k<n;k++){ const v=Math.min(1,base*(k===0?1:0.6+Math.random()*0.6)), tp=t+0.004+k*iv; const dep=Math.max(0.1,0.8-v*0.9), hold=0.002+Math.random()*0.006; g.linearRampToValueAtTime(1,tp-0.0005); g.linearRampToValueAtTime(dep,tp+0.0012); g.setValueAtTime(dep,tp+0.0012+hold); g.linearRampToValueAtTime(1,tp+0.0012+hold+0.003); }
-  let end=t+0.004+(n-1)*iv+0.012;
-  if(n>=4&&Math.random()<0.6){ const d0=end+0.01, len=0.015+Math.random()*0.035; g.linearRampToValueAtTime(1,d0); g.linearRampToValueAtTime(0.08,d0+0.002); g.setValueAtTime(0.08,d0+len); g.linearRampToValueAtTime(1,d0+len+0.004); end=d0+len+0.004; }
-  else if(Math.random()<0.4){ const d0=end, dep=0.7+Math.random()*0.18, len=0.02+Math.random()*0.03; g.linearRampToValueAtTime(dep,d0+0.003); g.setValueAtTime(dep,d0+len); g.linearRampToValueAtTime(1,d0+len+0.004); end=d0+len+0.004; }
-  const next=Math.max(end-t,0)+0.06+Math.random()*0.4;
+  // the contact chatters: deep notches in groups, breaks after rattles, and a crunchy bite on every notch (the signal is hard-cut, so the cut itself clicks)
+  const r=Math.random(); const n=r<0.4?1:r<0.6?2:r<0.78?3:4+Math.floor(Math.random()*6); const ratchet=Math.random()<0.5; const iv=ratchet?beat/8*(0.93+Math.random()*0.14):0.008+Math.random()*0.02;
+  g.cancelScheduledValues(t); g.setValueAtTime(g.value,t);
+  for(let k=0;k<n;k++){ const tp=t+0.004+k*iv, dep=Math.random()<0.7?0:0.25, hold=0.004+Math.random()*0.012; g.linearRampToValueAtTime(1,tp-0.0004); g.linearRampToValueAtTime(dep,tp+0.0006); g.setValueAtTime(dep,tp+0.0006+hold); g.linearRampToValueAtTime(1,tp+0.0006+hold+0.0012); }
+  let end=t+0.004+(n-1)*iv+0.02;
+  if(n>=4&&Math.random()<0.7){ const d0=end+0.01, len=0.03+Math.random()*0.09; g.linearRampToValueAtTime(1,d0); g.linearRampToValueAtTime(0,d0+0.001); g.setValueAtTime(0,d0+len); g.linearRampToValueAtTime(1,d0+len+0.002); end=d0+len+0.002; }   // dead contact for 30–120 ms after a rattle
+  else if(Math.random()<0.5){ const d0=end, dep=0.35+Math.random()*0.3, len=0.03+Math.random()*0.05; g.linearRampToValueAtTime(dep,d0+0.002); g.setValueAtTime(dep,d0+len); g.linearRampToValueAtTime(1,d0+len+0.003); end=d0+len+0.003; }
+  const next=Math.max(end-t,0)+0.03+Math.random()*0.25;
   crkTimer=setTimeout(crkStep,next*1000); }
 function gainHome(g,t,ms){ g.cancelScheduledValues(t); g.setValueAtTime(g.value,t); g.linearRampToValueAtTime(1,t+(ms||0.01)); setTimeout(()=>{ if(!M) return; const tt=ac.currentTime; g.cancelScheduledValues(tt); g.setValueAtTime(1,tt); },(ms||0.01)*1000+60); }
 function fxOn(k){ ensureAudio(); const t=ac.currentTime; fx[k]=true;
-  if(k==='crk'){ clearTimeout(crkTimer); M.flG.gain.setTargetAtTime(0.14,t,0.05); if(!fx.stop){ M.wd2.gain.setTargetAtTime(0.00022,t,0.1); M.wetG.gain.setTargetAtTime(1,t,0.03); M.dryG.gain.setTargetAtTime(0,t,0.03); } crkStep(); return; }
+  if(k==='crk'){ clearTimeout(crkTimer); M.flG.gain.setTargetAtTime(0.3,t,0.05); if(!fx.stop){ M.wd2.gain.setTargetAtTime(0.0006,t,0.1); M.wetG.gain.setTargetAtTime(1,t,0.03); M.dryG.gain.setTargetAtTime(0,t,0.03); } crkStep(); return; }
   if(k==='st32'||k==='st16'||k==='rnd'){ clearTimeout(gateTimer); gateStep(); return; }
   if(k==='dive'){ M.fxLP.frequency.cancelScheduledValues(t); M.fxLP.frequency.setTargetAtTime(260,t,0.08); M.fxLP.Q.setTargetAtTime(6,t,0.08); return; }
   if(k==='stop'){ M.wd1.gain.setTargetAtTime(0.0065,t,0.15); M.wd2.gain.setTargetAtTime(0.0006,t,0.15); M.wetG.gain.setTargetAtTime(1,t,0.02); M.dryG.gain.setTargetAtTime(0,t,0.02); return; } }
@@ -646,7 +646,7 @@ function fxOff(k){ if(!M) return; const t=ac.currentTime; fx[k]=false;
   if(k==='crk'){ clearTimeout(crkTimer); M.flG.gain.setTargetAtTime(0,t,0.03); gainHome(M.crkG.gain,t,0.008); if(!fx.stop){ M.wd2.gain.setTargetAtTime(0,t,0.1); M.wetG.gain.setTargetAtTime(0,t+0.12,0.03); M.dryG.gain.setTargetAtTime(1,t+0.12,0.03); } return; }
   if(k==='st32'||k==='st16'||k==='rnd'){ clearTimeout(gateTimer); if(fx.st32||fx.st16||fx.rnd) gateStep(); else gainHome(M.gateG.gain,t,0.01); return; }
   if(k==='dive'){ M.fxLP.frequency.cancelScheduledValues(t); M.fxLP.frequency.setTargetAtTime(20000,t,0.1); M.fxLP.Q.setTargetAtTime(0.7,t,0.1); return; }
-  if(k==='stop'){ M.wd1.gain.setTargetAtTime(0,t,0.1); if(fx.crk){ M.wd2.gain.setTargetAtTime(0.00022,t,0.1); } else { M.wd2.gain.setTargetAtTime(0,t,0.1); M.wetG.gain.setTargetAtTime(0,t+0.15,0.03); M.dryG.gain.setTargetAtTime(1,t+0.15,0.03); } return; } }
+  if(k==='stop'){ M.wd1.gain.setTargetAtTime(0,t,0.1); if(fx.crk){ M.wd2.gain.setTargetAtTime(0.0006,t,0.1); } else { M.wd2.gain.setTargetAtTime(0,t,0.1); M.wetG.gain.setTargetAtTime(0,t+0.15,0.03); M.dryG.gain.setTargetAtTime(1,t+0.15,0.03); } return; } }
 
 
 /* ---------- 降らす ---------- */
