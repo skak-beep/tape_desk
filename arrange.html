@@ -416,6 +416,14 @@ function shaker(u,v,pp,pn,at){ const t=at||ac.currentTime, lvl=(0.15+v*0.25)*pp.
 function perc(u,v,pp,pn,at){ const t=at||ac.currentTime, lvl=(0.3+v*0.4)*pp.level;
   if(u<0.34){ const out=dOut(t,0.15,pp,pn); const o=ac.createOscillator(), g=ac.createGain(); o.type='sine'; o.frequency.value=900+pp.tone*600; g.gain.setValueAtTime(lvl*0.6,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.025*pp.decay); o.connect(g).connect(out); o.start(t); o.stop(t+0.06); dNoise(t,{bp:2200,q:2,lp:8000,gain:lvl*0.7,dec:0.03},pp,out); return; }   // rim
   const dur=(0.18+u*0.2)*pp.decay, out=dOut(t,dur+0.1,pp,pn); const o=ac.createOscillator(), g=ac.createGain(); o.type='sine'; const f0=hz(root()+(u<0.67?7:12))*(1+pp.tone*0.02); o.frequency.setValueAtTime(f0*1.12,t); o.frequency.exponentialRampToValueAtTime(f0,t+0.03); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(lvl*1.4,t+0.003); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); o.connect(g).connect(out); o.start(t); o.stop(t+dur+0.05); dNoise(t,{hp:1500,lp:6000,gain:lvl*0.25,dec:0.01},pp,out); revSend(g,0.5*pp.rev); }   // conga / tom tuned to the key
+const XROWS=['単発','2連','3連','連打','速2連','乱'];
+// one group of contact pops. kind: 0 single 1 double 2 triple 3 ratchet(4–7) 4 fast double 5 random mix. Returns the group's duration.
+function popGroup(kind,v,u,pn,pp,at){ const t=at||ac.currentTime, beat=60/P.rate; let n, iv;
+  if(kind===5){ const r=Math.random(); kind=r<0.45?0:r<0.62?1:r<0.75?2:r<0.9?3:4; }
+  if(kind===0){ n=1; iv=0; } else if(kind===1){ n=2; iv=beat/8*(0.93+Math.random()*0.14); } else if(kind===2){ n=3; iv=beat/8*(0.93+Math.random()*0.14); } else if(kind===3){ n=4+Math.floor(Math.random()*4); iv=beat/8*(0.95+Math.random()*0.1); } else { n=2+(Math.random()<0.3?1:0); iv=0.008+Math.random()*0.017; }
+  const base=Math.min(1,Math.pow(10,-1.3+v*1.3)*(0.8+Math.random()*0.4)); const q=Object.assign({},pp,{tone:u});
+  for(let k=0;k<n;k++) pop(Math.min(1,base*(k===0?1:0.6+Math.random()*0.6)),pn+(Math.random()-0.5)*0.2,q,t+k*iv);
+  return (n-1)*iv+0.02; }
 function drumHit(c,r,v,pn,pp,at){ const u=c/(GC-1); switch(r){ case 0: kick(u,v,pn,pp,at); break; case 1: snare(u,v,pp,pn,at); break; case 2: clap(u,v,pp,pn,at); break; case 3: hat(u,v,pp,pn,at,false); break; case 4: u<0.5?hat(u*2,v,pp,pn,at,true):shaker((u-0.5)*2,v,pp,pn,at); break; case 5: perc(u,v,pp,pn,at); break; } }
 function wood(f0,v,pn,pp,at){ pp=pp||PP(); const t=at||ac.currentTime, o=ac.createOscillator(), gg=ac.createGain(); f0*=Math.pow(2,pp.pitch/12); o.type='triangle'; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f0*0.55,t+0.03); gg.gain.setValueAtTime((0.25+v*0.3)*pp.level,t); gg.gain.exponentialRampToValueAtTime(0.0001,t+(0.03+v*0.03)*pp.decay); o.connect(gg).connect(gate(t,0.12,pp,pn)); revSend(gg,0.3*pp.rev); o.start(t); o.stop(t+0.15); }
 function chirp(v,pn,pp,at){ pp=pp||PP(); const t=at||ac.currentTime, o=ac.createOscillator(), g=ac.createGain(); o.type='sine'; const f0=(1300+v*1400)*Math.pow(2,pp.pitch/12), len=(0.15+v*0.25)*pp.decay; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f0*(1.6+pp.tone*1.6),t+len); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.15*pp.level,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+len); o.connect(g).connect(gate(t,len,pp,pn)); revSend(g,1.2*pp.rev); o.start(t); o.stop(t+len+0.05); }
@@ -425,7 +433,7 @@ const INSTR=[
   {id:'sparkle',name:'きらめき',kind:'p',voice:'sparkle',m:{rev:0.6,dec:0.5}},{id:'bed',name:'床コード',kind:'p',voice:'bed',m:{rev:0.45,bright:0.4,oct:0}},
   {id:'pluck',name:'Pluck',kind:'p',voice:'pluck'},{id:'glass',name:'Glass',kind:'p',voice:'glass'},{id:'piano',name:'Piano',kind:'p',voice:'piano'},{id:'box',name:'Music box',kind:'p',voice:'box'},{id:'chime',name:'Chime',kind:'p',voice:'chime'},{id:'harp',name:'Harp',kind:'p',voice:'harp'},{id:'bell',name:'Bell',kind:'p',voice:'bell'},{id:'pad',name:'Pad',kind:'p',voice:'pad'},
   {id:'revgtr',name:'逆ギター',kind:'p',voice:'revgtr',m:{bright:0.5,rev:0.7,att:0.5,spread:0.4}},{id:'tapeKeys',name:'テープ鍵盤',kind:'p',voice:'tapeKeys',m:{wob:0.35,bright:0.4}},{id:'choir',name:'カセット合唱',kind:'p',voice:'choir',m:{wob:0.25,att:0.7}},{id:'organ',name:'VHSオルガン',kind:'p',voice:'organ',m:{wob:0.15}},{id:'bass',name:'ベース',kind:'p',voice:'bass',m:{oct:0}},{id:'drone',name:'ドローン',kind:'p',voice:'drone',m:{rev:0.5}},{id:'sub',name:'サブ',kind:'p',voice:'sub',m:{oct:-1,rev:0.2}},{id:'robo',name:'ロボ',kind:'p',voice:'robo',m:{wob:0.2,bright:0.4,rev:0.35,dec:0.5}},
-  {id:'drums',name:'ドラム',kind:'d',m:{rev:0.12,drive:0.25}},{id:'noise',name:'ノイズ',kind:'n'},{id:'grain',name:'粒',kind:'g',m:{rev:0.1,bright:0.7,wob:0,drive:0}} ];
+  {id:'drums',name:'ドラム',kind:'d',m:{rev:0.12,drive:0.25}},{id:'crackle',name:'接触不良',kind:'x',m:{rev:0.1,bright:0.5}},{id:'noise',name:'ノイズ',kind:'n'},{id:'grain',name:'粒',kind:'g',m:{rev:0.1,bright:0.7,wob:0,drive:0}} ];
 const MAC=()=>({att:0.5,dec:0.5,bright:0.5,wob:0,drive:0,rev:0.35,oct:0,spread:0.6}); INSTR.forEach(i=>i.mac=Object.assign(MAC(),i.m||{}));
 INSTR.forEach((it,i)=>{ const h=(262+i*(118/(INSTR.length-1)))%360; it.col=`hsl(${h.toFixed(0)} 70% 68%)`; });   // one slow hue drift along the list, so neighbours look related
 const curCol=()=>(mode==='glide'?instr:(INSTR.find(x=>x.id===curSet)||instr)).col;
@@ -440,6 +448,7 @@ function playVoice(it,semi,v,pn,pp,at){ const q=Object.assign(macPPi(it),{pitch:
     case 'bass': return bassPluck(semi+12,v,pn,q,at); case 'drone': return droneHold([semi,semi+7,semi+12],v,pn,q,at); default: return tone(semi,v,pn,q,at); } }
 const DRUMPADS=[['キック',0,0],['808',5,0],['スネア',2,1],['クラップ',2,2],['ハット',1,3],['オープン',1,4],['シェイカー',4,4],['リム',0,5]];
 function padsFor(it){ if(it.kind==='p') return PENTA.slice(0,8).map(semi=>mk(KEYS[(key+semi)%12],it.name,(v,pn,pp,at)=>playVoice(it,semi,v,pn,pp,at),{clean:true}));
+  if(it.kind==='x') return [['ポツ 小',0,0.2],['ポツ 大',0,0.8],['2連',1,0.5],['3連',2,0.5],['ラチェット',3,0.4],['ラチェット 大',3,0.9],['速い2連',4,0.5],['乱',5,0.6]].map(([l,kind,v])=>mk(l,'pop',(vv,pn,pp,at)=>{ const q=Object.assign(macPPi(it,{voice:undefined}),{level:pp.level,pan:pp.pan}); q.rev*=pp.rev; popGroup(kind,Math.min(1,v*(0.6+vv*0.6)),0.3+v*0.5,pn,q,at); },{clean:true}));
   if(it.kind==='d') return DRUMPADS.map(([l,c,r])=>mk(l,'drum',(v,pn,pp,at)=>{ const q=Object.assign(macPPi(it,{voice:undefined}),{level:pp.level,pan:pp.pan}); q.decay*=pp.decay; q.rev*=pp.rev; drumHit(c,r,v,pn,q,at); },{clean:true}));
   if(it.kind==='g') return Array.from({length:8},(_,i)=>mk('粒 '+(i+1),'—',(v,pn,pp,at)=>grain(i,v,pn,pp,at),{clean:true}));
   return [
@@ -526,7 +535,7 @@ function randStart(st){ let on=true, rate=1, last=null, rep=0; const loop=()=>{ 
     if(instr.kind==='n'){ const w=randStyle.kinds.map((x,i)=>(i===1||i===4)?x*0.35:x); const tot=w.reduce((a,b)=>a+b,0); let x=Math.random()*tot, k=0; while(x>w[k]&&k<4){ x-=w[k]; k++; } r=k; c=Math.min(GC-1,Math.max(0,Math.round(u*(GC-1)+(Math.random()-0.5)*2))); }   // the multi-hit rows (ツツツ, チリ) come up less often
     else { if(last&&Math.random()<randStyle.repeat*0.6){ c=last.c; r=last.r; } else { const sp=randStyle.spread; r=Math.min(GR-1,Math.max(0,r0+Math.round((Math.random()-0.5)*sp*4))); c=Math.min(GC-1,Math.max(0,Math.round(u*(GC-1)+(Math.random()-0.5)*sp*5))); } }
     last={c,r}; const acc=Math.random()<randStyle.accent*0.25; glNote(c,r,acc?0.9:0.3+Math.random()*0.35,true,!acc);
-    const isN=instr.kind==='n'; const base=isN?(110+(1-u)*(1-u)*760):(40+(1-u)*(1-u)*520); rate*=1+(Math.random()-0.5)*randStyle.drift*0.5; rate=Math.min(3,Math.max(0.35,rate)); let wait=base*rate;
+    const isN=instr.kind==='n'||instr.kind==='x'; const base=isN?(110+(1-u)*(1-u)*760):(40+(1-u)*(1-u)*520); rate*=1+(Math.random()-0.5)*randStyle.drift*0.5; rate=Math.min(3,Math.max(0.35,rate)); let wait=base*rate;
     if(isN&&(r===1||r===4)) wait*=2.6;   // a multi-hit sound already filled the time — leave room after it
     if(Math.random()<randStyle.burst*(isN?0.25:0.5)) wait*=isN?0.5:0.25; else if(Math.random()<randStyle.swing*0.3) wait*=2.2;
     setTimeout(loop,wait); }; loop(); return ()=>{ on=false; }; }
@@ -537,6 +546,7 @@ const NROWS=['ツ','ツツツ','プツッ','コツ','チリ','乱'];
 function glNote(c,r,v,quick,drag){ const m=instr.mac, pn=(c-(GC-1)/2)/(GC-1)*1.4*m.spread; lit.set(c+':'+r,1); const u=c/(GC-1);
   if(instr.kind==='p'){ const pp=macPP(m); if(drag){ pp.decay*=0.4; pp.rev*=0.55; pp.level*=0.85; } if(glChord&&!['revgtr','robo','bed','sparkle'].includes(instr.voice)){ { const st=chordSemis(c,r).map((sm,k)=>tone(sm,v*(k?0.8:1),pn,pp)); return f=>st.forEach(x=>x&&x(f)); } } if(instr.voice==='revgtr'){ revChord(cellSemi(c,r),v,pn,pp,false); return; } if(instr.voice==='robo'){ robo(cellSemi(c,r),v,pn,pp,false); return; } if(instr.voice==='bed'){ bed(cellSemi(c,r),v,pn,pp,false); return; } if(instr.voice==='sparkle'){ sparkle(cellSemi(c,r),v,pn,pp,false); return; } if(instr.voice==='bass'){ bassPluck(cellSemi(c,r)+12,v,pn,pp); return; } if(instr.voice==='drone'){ const sm=cellSemi(c,r); const st=droneHold([sm,sm+7,sm+12],v*0.8,pn,pp); setTimeout(st,900); return; } return tone(cellSemi(c,r),v,pn,pp); }
   if(instr.kind==='d'){ drumHit(c,r,drag?v*0.7:v,pn,macPP(m,{voice:undefined})); return; }
+  if(instr.kind==='x'){ popGroup(r,Math.min(1,0.25+u*0.75)*(drag?0.8:1),0.3+u*0.6,pn,macPP(m,{voice:undefined})); return; }
   if(instr.kind==='g'){ if(!sample){ toast('上の「粒の素材」で録音かファイルを入れてください'); return; } const pp=macPP(m,{pitch:[-12,-7,0,0,7,12][r]+m.oct*12,voice:undefined,glide:false}); grain(Math.min(7,c),v,pn,pp); return; }
   const pp=macPP(m,{voice:undefined}); const g=0.35+v*0.5; // noise palette: row = kind, column = variation
   switch(r){ case 0: noise({hp:1200+u*5000,len:0.003+u*0.004,gain:g*0.5,pan:pn},pp); break;
@@ -548,6 +558,7 @@ function glNote(c,r,v,quick,drag){ const m=instr.mac, pn=(c-(GC-1)/2)/(GC-1)*1.4
 function glSwell(c,r,v){ const m=instr.mac, pn=(c-(GC-1)/2)/(GC-1)*1.4*m.spread, u=c/(GC-1);
   if(instr.kind==='p'&&instr.voice==='vpiano'){ const stops=chordSemis(c,r).map(sm=>pianoHold(sm,v,pn,macPP(m))); return ()=>stops.forEach(f=>f()); }
   if(instr.kind==='p') return instr.voice==='revgtr'?revChord(cellSemi(c,r),v,pn,macPP(m),true):instr.voice==='robo'?robo(cellSemi(c,r),v,pn,macPP(m),true):instr.voice==='bed'?bed(cellSemi(c,r),v,pn,macPP(m),true):instr.voice==='sparkle'?sparkle(cellSemi(c,r),v,pn,macPP(m),true):instr.voice==='drone'?droneHold([cellSemi(c,r),cellSemi(c,r)+7,cellSemi(c,r)+12],v,pn,macPP(m)):instr.voice==='bass'?(bassPluck(cellSemi(c,r)+12,v,pn,macPP(m)),null):swell(cellSemi(c,r),v,pn,macPP(m));
+  if(instr.kind==='x'){ let on=true; const pp=macPP(m,{voice:undefined}); const loop=()=>{ if(!on) return; const d=popGroup(r,Math.min(1,0.25+u*0.75),0.3+u*0.6,pn,pp); setTimeout(loop,(d+0.06+Math.random()*(r===5?0.4:0.25))*1000); }; setTimeout(loop,120); return ()=>{ on=false; }; }   // hold = keeps crackling like the FX did
   if(instr.kind==='d'){ const beat=60/P.rate, iv=[beat,beat,beat,r===3?beat/4:beat/2,beat/2,beat/2][r]*(r===3&&u>0.66?0.5:1); let on=true, k=0; const pp=macPP(m,{voice:undefined}); drumHit(c,r,v,pn,pp); const loop=()=>{ if(!on) return; k++; drumHit(c,r,(k%2?0.45:0.75)*v+0.1,pn,pp); setTimeout(loop,iv*1000); }; setTimeout(loop,iv*1000); return ()=>{ on=false; }; }   // hold = repeat in time with BPM
   if(instr.kind==='n'){ const pp=macPP(m,{voice:undefined});
     if(r===4||r===3){ let on=true; const loop=()=>{ if(!on) return; glNote(c,r,0.4,true); setTimeout(loop,120+(1-u)*400+Math.random()*120); }; loop(); return ()=>{ on=false; }; }
@@ -597,7 +608,7 @@ const FXC={st32:'#f06aa8',st16:'#8a7cff',rnd:'#3ddbb0',dive:'#4f8cff',stop:'#ffb
 function drawGlide(){ if(!GW) glResize(); if(!GW||$('#glide').hidden) return; gg.clearRect(0,0,GW,GH); const cw=cellW(), ch=cellH(), fx0=0, acc=instr.col, fg=css('--fg'), dim=css('--dim'), line=css('--line');
   const rr=(x,y,w,h,r)=>{ gg.beginPath(); gg.roundRect?gg.roundRect(x,y,w,h,r):gg.rect(x,y,w,h); };
   gg.save(); gg.translate(OX(),0); const GR4=[12,12,0,12]; rr(0,0,GWg(),GH,GR4); gg.fillStyle=css('--bg-2'); gg.fill(); rr(0,0,GWg(),GH,GR4); gg.clip(); if(isKbd()) drawKbd(GWg(),acc,fg,dim,line); else for(let c=0;c<GC;c++) for(let r=0;r<GR;r++){ const x=c*cw, y=(GR-1-r)*ch; const k=c+':'+r; const a=lit.get(k)||0; gg.strokeStyle=line; gg.strokeRect(x+0.5,y+0.5,cw-1,ch-1); if(a>0){ gg.fillStyle=acc; gg.globalAlpha=a*0.5; gg.fillRect(x+1,y+1,cw-2,ch-2); gg.globalAlpha=1; lit.set(k,a-0.05); if(a<=0.05) lit.delete(k); }
-    let label='', strong=false; if(instr.kind==='p'){ const semi=cellSemi(c,r); label=KEYS[((key+semi)%12+12)%12]+(4+Math.floor((semi+key)/12)); strong=semi%12===0; } else if(instr.kind==='n'){ label=c===0?NROWS[r]:(r===1?(2+Math.round(c/(GC-1)*5))+'連':'·'.repeat(c)); strong=c===0; } else if(instr.kind==='d'){ label=c===0?DROWS[r]:(r===0?['','短','','','','808'][c]:r===4?['','開','開','シェ','シェ','シェ'][c]:r===5?['','リム','5度','5度','8va','8va'][c]:'·'.repeat(c)); strong=c===0; } else { label=c===0?['−8va','−5','0','0','+5','+8va'][r]:'粒'+(c+1); strong=c===0; }
+    let label='', strong=false; if(instr.kind==='p'){ const semi=cellSemi(c,r); label=KEYS[((key+semi)%12+12)%12]+(4+Math.floor((semi+key)/12)); strong=semi%12===0; } else if(instr.kind==='n'){ label=c===0?NROWS[r]:(r===1?(2+Math.round(c/(GC-1)*5))+'連':'·'.repeat(c)); strong=c===0; } else if(instr.kind==='x'){ label=c===0?XROWS[r]:['','小','','中','','大'][c]; strong=c===0; } else if(instr.kind==='d'){ label=c===0?DROWS[r]:(r===0?['','短','','','','808'][c]:r===4?['','開','開','シェ','シェ','シェ'][c]:r===5?['','リム','5度','5度','8va','8va'][c]:'·'.repeat(c)); strong=c===0; } else { label=c===0?['−8va','−5','0','0','+5','+8va'][r]:'粒'+(c+1); strong=c===0; }
     gg.fillStyle=strong?acc:dim; gg.font=(strong?'600 ':'')+'11px '+css('--mono'); gg.textAlign='center'; gg.textBaseline='middle'; gg.fillText(label,x+cw/2,y+ch/2); }
   gg.restore(); rr(fx0,0,fxW(),GH,12); gg.fillStyle='#121119'; gg.fill();
   if(stripFx){ const zh=GH/FXL.length; FXL.forEach(([k,nm,sub],i)=>{ const y=i*zh, on=!!fx[k], col=FXC[k]; const rx=fx0+4, ry=y+4, rw=fxW()-8, rh=zh-8; gg.save(); gg.shadowColor=col; gg.shadowBlur=on?22:12; gg.fillStyle=on?col:ca2(col,0.16); gg.beginPath(); gg.roundRect?gg.roundRect(rx,ry,rw,rh,7):gg.rect(rx,ry,rw,rh); gg.fill(); gg.restore(); gg.strokeStyle=ca2(col,on?0.9:0.45); gg.lineWidth=1; gg.beginPath(); gg.roundRect?gg.roundRect(rx+0.5,ry+0.5,rw-1,rh-1,7):gg.rect(rx+0.5,ry+0.5,rw-1,rh-1); gg.stroke(); gg.fillStyle=on?'#000':col; gg.font='600 10px '+css('--mono'); gg.textAlign='center'; gg.textBaseline='middle'; gg.fillText(nm,fx0+fxW()/2,y+zh/2-6); gg.fillStyle=on?'#3a2412':dim; gg.font='9px '+css('--mono'); gg.fillText(sub,fx0+fxW()/2,y+zh/2+7); }); }
@@ -610,23 +621,20 @@ function drawGlide(){ if(!GW) glResize(); if(!GW||$('#glide').hidden) return; gg
 
 /* ---------- hold FX on the pad bus ---------- */
 const fx={st32:false,st16:false,rnd:false,dive:false,stop:false,crk:false}; let crkTimer=null, gateTimer=null;
-const FXL=[['st32','Ratchet','1/32 刻み'],['st16','Stutter','1/16 刻み'],['rnd','Shuffle','刻みランダム'],['dive','Dive','こもる'],['stop','Wobble','テープよれ'],['crk','接触不良','パチパチ']];
+const FXL=[['st32','Ratchet','1/32 刻み'],['st16','Stutter','1/16 刻み'],['rnd','Shuffle','刻みランダム'],['dive','Dive','こもる'],['stop','Wobble','テープよれ'],['crk','ガリ','接点のガリ']];
 // rhythmic gate on the live bus (sound keeps ringing underneath; the gate just chops it)
 function gateStep(){ if(!(fx.st32||fx.st16||fx.rnd)||!M) return; const t=ac.currentTime, beat=60/P.rate; let div, duty=0.55;
   if(fx.rnd){ const r=Math.random(); div=r<0.35?8:r<0.75?4:2; duty=0.35+Math.random()*0.4; } else div=fx.st32?8:4;   // shuffle: 1/32, 1/16 and 1/8 mixed at random
   const per=beat/div, g=M.gateG.gain; g.cancelScheduledValues(t); g.setValueAtTime(g.value,t); g.linearRampToValueAtTime(1,t+0.003); g.setValueAtTime(1,t+per*duty); g.linearRampToValueAtTime(0.06,t+per*duty+0.005); gateTimer=setTimeout(gateStep,per*1000-3); }
-function crkStep(){ if(!fx.crk||!M) return; const t=ac.currentTime, beat=60/P.rate, pp=PP(), g=M.crkG.gain;
-  // modelled on the reference: ~3.5 groups/s; group of 1 (55%) 2 (17%) 3 (13%) or 4–8 pops; inside a group either a 1/32 ratchet (~64 ms) or a fast double (8–25 ms)
-  const r=Math.random(); const n=r<0.55?1:r<0.72?2:r<0.85?3:4+Math.floor(Math.random()*5); const ratchet=Math.random()<0.5; const iv=ratchet?beat/8*(0.93+Math.random()*0.14):0.008+Math.random()*0.017; const pn=(Math.random()-0.5)*0.5;
-  const base=Math.pow(10,-1.2+Math.random()*0.9);   // 0.06 … 0.5 — log-spread like the recording
-  g.cancelScheduledValues(t); g.setValueAtTime(g.value,t);
-  for(let k=0;k<n;k++){ const v=Math.min(1,base*(k===0?1:0.6+Math.random()*0.6)), tp=t+0.004+k*iv; pop(v,pn+(Math.random()-0.5)*0.2,pp,tp);
-    // the contact bounces with the pop: the played sound takes a 2–7 ms notch, deeper for louder pops
-    const dep=Math.max(0.15,0.85-v*0.9), hold=0.002+Math.random()*0.005; g.linearRampToValueAtTime(1,tp-0.0005); g.linearRampToValueAtTime(dep,tp+0.0012); g.setValueAtTime(dep,tp+0.0012+hold); g.linearRampToValueAtTime(1,tp+0.0012+hold+0.003); }
+function crkStep(){ if(!fx.crk||!M) return; const t=ac.currentTime, beat=60/P.rate, g=M.crkG.gain;
+  // the contact chatters without the pops: notches in groups (same timing family as the recording), breaks after rattles, shallow dips
+  const r=Math.random(); const n=r<0.55?1:r<0.72?2:r<0.85?3:4+Math.floor(Math.random()*5); const ratchet=Math.random()<0.5; const iv=ratchet?beat/8*(0.93+Math.random()*0.14):0.008+Math.random()*0.017;
+  const base=Math.pow(10,-1.2+Math.random()*0.9); g.cancelScheduledValues(t); g.setValueAtTime(g.value,t);
+  for(let k=0;k<n;k++){ const v=Math.min(1,base*(k===0?1:0.6+Math.random()*0.6)), tp=t+0.004+k*iv; const dep=Math.max(0.1,0.8-v*0.9), hold=0.002+Math.random()*0.006; g.linearRampToValueAtTime(1,tp-0.0005); g.linearRampToValueAtTime(dep,tp+0.0012); g.setValueAtTime(dep,tp+0.0012+hold); g.linearRampToValueAtTime(1,tp+0.0012+hold+0.003); }
   let end=t+0.004+(n-1)*iv+0.012;
-  if(n>=4&&Math.random()<0.6){ const d0=end+0.01, len=0.015+Math.random()*0.035; g.linearRampToValueAtTime(1,d0); g.linearRampToValueAtTime(0.08,d0+0.002); g.setValueAtTime(0.08,d0+len); g.linearRampToValueAtTime(1,d0+len+0.004); end=d0+len+0.004; }   // a longer break after a rattle
-  else if(Math.random()<0.4){ const d0=end, dep=0.7+Math.random()*0.18, len=0.02+Math.random()*0.03; g.linearRampToValueAtTime(dep,d0+0.003); g.setValueAtTime(dep,d0+len); g.linearRampToValueAtTime(1,d0+len+0.004); end=d0+len+0.004; }   // or a shallow 20–50 ms dip
-  const next=Math.max(end-t,0)+0.06+Math.random()*0.4;   // groups ~3.5 per second
+  if(n>=4&&Math.random()<0.6){ const d0=end+0.01, len=0.015+Math.random()*0.035; g.linearRampToValueAtTime(1,d0); g.linearRampToValueAtTime(0.08,d0+0.002); g.setValueAtTime(0.08,d0+len); g.linearRampToValueAtTime(1,d0+len+0.004); end=d0+len+0.004; }
+  else if(Math.random()<0.4){ const d0=end, dep=0.7+Math.random()*0.18, len=0.02+Math.random()*0.03; g.linearRampToValueAtTime(dep,d0+0.003); g.setValueAtTime(dep,d0+len); g.linearRampToValueAtTime(1,d0+len+0.004); end=d0+len+0.004; }
+  const next=Math.max(end-t,0)+0.06+Math.random()*0.4;
   crkTimer=setTimeout(crkStep,next*1000); }
 function gainHome(g,t,ms){ g.cancelScheduledValues(t); g.setValueAtTime(g.value,t); g.linearRampToValueAtTime(1,t+(ms||0.01)); setTimeout(()=>{ if(!M) return; const tt=ac.currentTime; g.cancelScheduledValues(tt); g.setValueAtTime(1,tt); },(ms||0.01)*1000+60); }
 function fxOn(k){ ensureAudio(); const t=ac.currentTime; fx[k]=true;
