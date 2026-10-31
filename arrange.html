@@ -180,8 +180,8 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
     </div>
     <div id="glide-row" hidden>
       <div class="row between">
-        <div class="grp" id="grp-play"><span class="cap">演奏</span><button id="gl-scale">ペンタ</button><button id="gl-chord">和音</button><button id="gl-rand">乱</button><button id="gl-seed">種</button></div>
-        <div class="grp" id="grp-tone"><span class="cap">音色</span><button id="b-mac">開く</button></div>
+        <div class="grp" id="grp-play"><span class="cap">演奏</span><button id="gl-scale">ペンタ</button><button id="gl-major">短調</button><button id="gl-chord">和音</button><button id="gl-rand">乱</button><button id="gl-seed">種</button></div>
+        <div class="grp" id="grp-tone"><span class="cap">音色</span><button id="oct-dn">−8va</button><span id="oct-v" class="lbl" style="min-width:2.2em;text-align:center">0</span><button id="oct-up">+8va</button><button id="b-mac">開く</button></div>
         <div class="grp" id="grp-fxtl"><span class="cap">FX</span><button id="b-fxtl" class="on">並べた音にも</button></div>
       </div>
       <div class="lbl" style="text-transform:none">なぞる=連打 · 止める=持続 · 乱=ランダム · 左の帯=2本目の指(FX は縦にスライド)</div>
@@ -363,10 +363,10 @@ function revChord(semi,v,pn,pp,hold){ pp=pp||PP(); const t=ac.currentTime, bm=ro
   src.connect(lp).connect(base).connect(g).connect(out); revSend(g,1.4*pp.rev); src.start(t); tr.stop(t+buf.duration+0.3);
   return ()=>{ const tt=ac.currentTime; g.gain.cancelScheduledValues(tt); g.gain.setValueAtTime(g.gain.value,tt); g.gain.linearRampToValueAtTime(0.0001,tt+0.18); try{ src.stop(tt+0.25); }catch(e){} }; }
 /* chord bed: low minor triad + one long high note (the key's 5th), soft attack, long ring — the loud slow layer under the reference */
-function bed(semi,v,pn,pp,hold){ pp=pp||PP(); const t=ac.currentTime, bm=root()+semi+pp.pitch, dur=hold?60:3.5, lvl=0.13*(0.6+v*0.4)*pp.level, g=ac.createGain(), out=gate(t,dur,{...pp,reverse:false,cut:1},pn);
+function bed(semi,v,pn,pp,hold){ pp=pp||PP(); const t=ac.currentTime, bm=root()+12+semi+pp.pitch, dur=hold?60:3.5, lvl=0.13*(0.6+v*0.4)*pp.level, g=ac.createGain(), out=gate(t,dur,{...pp,reverse:false,cut:1},pn);
   g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(lvl,t+(hold?0.4:0.25)*(pp.attMul||1)); if(!hold){ g.gain.setValueAtTime(lvl,t+2.2); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); }
-  const lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1200+pp.tone*1600; lp.Q.value=0.6; lp.connect(g); const oscs=[];
-  const tones=[[0,1,'sine'],[0,0.35,'triangle'],[7,0.7,'sine'],[15,0.45,'sine'],[12,0.3,'triangle'],[root()+31-bm,0.35,'sine']];   // root, 5th, minor 3rd above, octave, and the long high 5th
+  const lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=700+pp.tone*4800; lp.Q.value=0.6; lp.connect(g); const oscs=[];
+  const third=keyMajor?16:15; const tones=[[0,1,'sine'],[0,0.35,'triangle'],[7,0.7,'sine'],[third,0.45,'sine'],[12,0.3,'triangle'],[root()+43-bm,0.35,'sine']];   // root, 5th, minor 3rd above, octave, and the long high 5th
   for(const [iv,gn,type] of tones) for(const det of [-4,4]){ const o=ac.createOscillator(); o.type=type; o.frequency.value=hz(bm+iv); o.detune.value=det+bend*100; const og=ac.createGain(); og.gain.value=gn*0.5; o.connect(og).connect(lp); o.start(t); o.stop(t+dur+1.5); oscs.push(o); const e={o,det}; bendable.add(e); o.onended=()=>bendable.delete(e); }
   g.connect(out); revSend(g,1.0*pp.rev); return ()=>{ const tt=ac.currentTime; g.gain.cancelScheduledValues(tt); g.gain.setValueAtTime(g.gain.value,tt); g.gain.exponentialRampToValueAtTime(0.0001,tt+1.2); oscs.forEach(o=>o.stop(tt+1.4)); }; }
 /* sparkle: a shower of very quiet, very short high notes leaping by octaves and fifths, free-timed, sometimes two at once — the layer that shimmers under everything */
@@ -531,7 +531,7 @@ $('#b-seq2clip').onclick=()=>{ ensureAudio(); if(recording){ rec(false); return;
 /* ---------- glide surface: a lattice of consonant neighbours; drag = runs of short notes, hold = swell; 2nd finger = bend + tone ---------- */
 function applyDrive(){ if(!M) return; const u=instr.mac.drive; M.gdrive.curve=u<0.03?new Float32Array([-1,0,1]):satCurve(Math.pow(u,2)*0.9); }
 const gl=$('#glide'), gg=gl.getContext('2d'); let GW=0,GH=0; const GC=6, GR=6; let glScale='penta';
-const SC={penta:[0,3,5,7,10],minor:[0,2,3,5,7,8,10]};
+const SCm={penta:[0,3,5,7,10],minor:[0,2,3,5,7,8,10]}, SCM={penta:[0,2,4,7,9],minor:[0,2,4,5,7,9,11]}; let keyMajor=false; const SC=new Proxy({},{get:(_,k)=>(keyMajor?SCM:SCm)[k]});
 function glResize(){ const r=gl.getBoundingClientRect(); if(!r.width) return; const d=Math.min(2,devicePixelRatio||1); GW=r.width;GH=r.height; gl.width=GW*d; gl.height=GH*d; gg.setTransform(d,0,0,d,0,0); const pl=gl.parentElement; if(pl){ pl.style.setProperty('--sw',fxW()+'px'); pl.style.setProperty('--gap',GAP+'px'); } }
 new ResizeObserver(glResize).observe(gl);
 const GAP=4, fxW=()=>Math.max(54,(GW-GAP)*0.2), OX=()=>fxW()+GAP, GWg=()=>GW-fxW()-GAP, cellW=()=>GWg()/GC, cellH=()=>GH/GR;
@@ -615,12 +615,15 @@ document.addEventListener('keydown',e=>{ if(e.repeat||e.ctrlKey||e.metaKey||e.al
   if(!(k in KBMAP)||mode!=='glide'||instr.kind!=='p'||kbHeld.has(k)) return; ensureAudio(); const sm=KBMAP[k]+kbdOct*12-12, pn=((sm+12)/24-0.5)*0.8*instr.mac.spread; const st={last:kbdNote(sm,0.75,pn,false),stop:null}; st.timer=setTimeout(()=>{ if(kbHeld.get(k)===st&&!st.stop) st.stop=watchHold(kbdHold(sm,0.7,pn)); },190); kbHeld.set(k,st); });
 document.addEventListener('keyup',e=>{ const k=e.key.toLowerCase(), st=kbHeld.get(k); if(!st) return; clearTimeout(st.timer); if(st.stop) st.stop(); if(typeof st.last==='function') st.last(); kbHeld.delete(k); });
 $('#gl-chord').onclick=e=>{ glChord=!glChord; e.target.classList.toggle('on',glChord); };
+$('#gl-major').onclick=e=>{ keyMajor=!keyMajor; e.target.textContent=keyMajor?'長調':'短調'; e.target.classList.toggle('on',keyMajor); $('#b-key').textContent=KEYS[key]+(keyMajor?' major':' minor'); };
+function octTarget(){ return mode==='glide'?instr:(INSTR.find(x=>x.id===curSet)||instr); } function showOct(){ $('#oct-v').textContent=(octTarget().mac.oct>0?'+':'')+octTarget().mac.oct; }
+$('#oct-dn').onclick=()=>{ const it=octTarget(); it.mac.oct=Math.max(-2,it.mac.oct-1); showOct(); if(macTarget===it) openMacro(it); }; $('#oct-up').onclick=()=>{ const it=octTarget(); it.mac.oct=Math.min(2,it.mac.oct+1); showOct(); if(macTarget===it) openMacro(it); };
 const instrEl=$('#instr'); INSTR.forEach(it=>{ const b=document.createElement('button'); b.textContent=it.kind==='n'?'ノイズ / グリッチ':it.name; b.dataset.i=it.id; b.style.setProperty('--cc',it.col); if(it.kind!=='p') b.classList.add('grp'); b.onclick=()=>{ ensureAudio(); if(mode==='glide'){ instr=it; applyDrive(); renderInstr(); } else { curSet=it.id; if(selected.set!==curSet) selected={set:curSet,idx:0}; build(); } }; dbl(b,()=>openMacro(it)); instrEl.appendChild(b); });
 let macTarget=INSTR[0]; function openMacro(it){ macTarget=it; $('#macro').hidden=false; $('#mac-name').textContent=it.name+' — 全体の音色'; document.querySelectorAll('[data-mac]').forEach(r=>r.value=it.mac[r.dataset.mac]); $('#b-mac').classList.add('on'); }
 $('#mac-close').onclick=()=>{ $('#macro').hidden=true; $('#b-mac').classList.remove('on'); $('#b-mac').textContent='開く'; };
 document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{ mode=b.dataset.mode; build(); });
-function renderInstr(){ const cur=mode==='glide'?instr.id:curSet; document.documentElement.style.setProperty('--ic',curCol()); $('#grain-src').hidden=cur!=='grain'; const showSl=cur==='grain'&&!!sample&&slOpen; $('#slicer').hidden=!showSl; $('#slicer-row').hidden=!showSl; $('#sl-nums').hidden=!showSl; $('#slfx').hidden=!showSl; $('#sl-toggle').hidden=!sample; $('#sl-toggle').textContent=slOpen?'波形を閉じる':'波形を開く'; if(showSl) slfxShow(); else if(slAuto&&typeof slAutoSet==='function') slAutoSet(false); if(cur==='grain'&&sample) requestAnimationFrame(slResize); instrEl.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.i===cur)); if(!$('#macro').hidden&&macTarget!==instr&&mode==='glide') openMacro(instr); $('#gl-scale').hidden=instr.kind!=='p'; $('#gl-chord').hidden=instr.kind!=='p'; $('#seg-view').style.visibility=instr.kind==='p'?'visible':'hidden'; }
-document.querySelectorAll('[data-mac]').forEach(r=>r.oninput=()=>{ macTarget.mac[r.dataset.mac]=+r.value; if(r.dataset.mac==='drive'&&macTarget===instr) applyDrive(); });
+function renderInstr(){ const cur=mode==='glide'?instr.id:curSet; if(typeof showOct==='function') showOct(); document.documentElement.style.setProperty('--ic',curCol()); $('#grain-src').hidden=cur!=='grain'; const showSl=cur==='grain'&&!!sample&&slOpen; $('#slicer').hidden=!showSl; $('#slicer-row').hidden=!showSl; $('#sl-nums').hidden=!showSl; $('#slfx').hidden=!showSl; $('#sl-toggle').hidden=!sample; $('#sl-toggle').textContent=slOpen?'波形を閉じる':'波形を開く'; if(showSl) slfxShow(); else if(slAuto&&typeof slAutoSet==='function') slAutoSet(false); if(cur==='grain'&&sample) requestAnimationFrame(slResize); instrEl.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.i===cur)); if(!$('#macro').hidden&&macTarget!==instr&&mode==='glide') openMacro(instr); $('#gl-scale').hidden=instr.kind!=='p'; $('#gl-chord').hidden=instr.kind!=='p'; $('#seg-view').style.visibility=instr.kind==='p'?'visible':'hidden'; }
+document.querySelectorAll('[data-mac]').forEach(r=>r.oninput=()=>{ macTarget.mac[r.dataset.mac]=+r.value; if(r.dataset.mac==='drive'&&macTarget===instr) applyDrive(); if(r.dataset.mac==='oct') showOct(); });
 $('#b-mac').onclick=()=>{ if($('#macro').hidden||macTarget!==instr) openMacro(instr); else $('#mac-close').onclick(); $('#b-mac').textContent=$('#macro').hidden?'開く':'閉じる'; };
 $('#mac-reset').onclick=()=>{ macTarget.mac=Object.assign(MAC(),macTarget.m||{}); if(macTarget===instr) applyDrive(); openMacro(macTarget); };
 renderInstr();
@@ -682,7 +685,7 @@ $('#b-auto').onclick=()=>{ ensureAudio(); autoOn=!autoOn; $('#b-auto').classList
 const PRESETS={video:{dark:50,rev:60,tape:50,decay:100},fog:{dark:75,rev:90,tape:70,decay:160},glass:{dark:20,rev:80,tape:15,decay:120}};
 document.querySelectorAll('[data-pre]').forEach(b=>b.onclick=()=>{ document.querySelectorAll('[data-pre]').forEach(x=>x.classList.toggle('on',x===b)); Object.assign(P,PRESETS[b.dataset.pre]); showKnobs(); applyKnobs(); toast('Preset: '+b.textContent); });
 document.querySelectorAll('[data-len]').forEach(b=>b.onclick=()=>{ if(layers.length){ toast('レイヤーがあるので長さは変えられません(Clear all で可)'); return; } loopLen=+b.dataset.len; document.querySelectorAll('[data-len]').forEach(x=>x.classList.toggle('on',x===b)); $('#r-len').textContent=loopLen; if(playing) play(true); });
-$('#b-key').onclick=()=>{ key=(key+[5,7,2,10,3][Math.floor(Math.random()*5)])%12; $('#b-key').textContent=KEYS[key]+' minor'; build(); };
+$('#b-key').onclick=()=>{ key=(key+[5,7,2,10,3][Math.floor(Math.random()*5)])%12; $('#b-key').textContent=KEYS[key]+(keyMajor?' major':' minor'); build(); };
 
 // ---- slice editor: waveform of the grain sample with the 8 slices; tap = select + audition, drag edges = trim, drag middle = move
 const sl=$('#slicer'), sg=sl.getContext('2d'); let SW=0,SH=0, slSel=0, slZoom=false, slDrag=null;
