@@ -680,8 +680,8 @@ let texTimer=null;
 // the held sound is re-struck: each pulse rises in ~10 ms and sinks toward near-silence, 2–7 pulses a second with irregular spacing, sometimes a quick double, sometimes a longer hush
 function texStep(){ if(!fx.stop||!M) return; const t=ac.currentTime, g=M.texP; const r=Math.random();
   const iv=r<0.15?0.07+Math.random()*0.05:r<0.85?0.14+Math.random()*0.26:0.45+Math.random()*0.5;   // fast double / normal / hush
-  const floor=0.04+Math.random()*0.14, peak=0.75+Math.random()*0.25, tc=Math.max(0.03,iv*(0.22+Math.random()*0.25));
-  g.cancelScheduledValues(t); g.setValueAtTime(g.value,t); g.linearRampToValueAtTime(peak,t+0.01); g.setTargetAtTime(floor,t+0.012,tc);
+  const floor=0.08+Math.random()*0.14, peak=1.45+Math.random()*0.3, hold=iv*(0.34+Math.random()*0.15), tc=Math.max(0.025,iv*0.18);   // peaks above unity + a held top so the overall loudness stays where it was
+  g.cancelScheduledValues(t); g.setValueAtTime(g.value,t); g.linearRampToValueAtTime(peak,t+0.01); g.setValueAtTime(peak,t+0.01+hold); g.setTargetAtTime(floor,t+0.01+hold,tc);
   texTimer=setTimeout(texStep,iv*1000); }
 function fxOff(k){ if(!M) return; const t=ac.currentTime; fx[k]=false;
   if(k==='crk'){ clearTimeout(crkTimer); M.flP.setTargetAtTime(0,t,0.03); gainHome(M.crkP,t,0.008); if(!fx.stop){ M.wd2.gain.setTargetAtTime(0,t,0.1); M.wetP.setTargetAtTime(0,t+0.12,0.03); M.dryP.setTargetAtTime(1,t+0.12,0.03); } else M.wd2.gain.setTargetAtTime(0,t,0.1); return; }
