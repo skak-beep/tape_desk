@@ -25,6 +25,12 @@ body[data-mode=glide]{--mc:#ff7a5a} body[data-mode=step]{--mc:#45a6ff}
 .cap{font-size:10px;color:var(--dim);letter-spacing:.14em;text-transform:uppercase;min-width:3.2em} .grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px 8px;border:1px solid var(--line);border-radius:10px;background:var(--bg-2)} .grp button{min-height:38px;padding:8px 11px;font-size:11px;background:transparent}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--bg-2)} .seg button{border:0;border-radius:0;min-height:38px;padding:8px 12px;font-size:11px;color:var(--dim);background:transparent} .seg button+button{border-left:1px solid var(--line)} .seg button.on{background:var(--bg-3);color:var(--fg);font-weight:600;box-shadow:inset 0 -2px 0 var(--mc)}
 .between{justify-content:space-between}
+#vid-sec{display:flex;flex-direction:column;gap:8px} #vid-sec[hidden]{display:none!important}
+.vwrap{position:relative;width:100%;aspect-ratio:4/5;max-height:62vh;border-radius:16px;overflow:hidden;background:#000;border:1px solid var(--line)}
+.vwrap video,.vwrap img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block} .vwrap video[hidden],.vwrap img[hidden]{display:none}
+.vwrap canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.vempty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--dim);text-align:center;padding:20px} .vempty span{color:var(--fg);font-weight:600;letter-spacing:.1em} .vempty small{font-size:10px;line-height:1.6} .vempty[hidden]{display:none}
+#t-vid.on{background:var(--bg-3);border-color:var(--dim);color:var(--fg)}
 #glide-row>*+*{margin-top:10px}
 /* the surface sits on a filled plate; the active tab is the same plate flowing out of its bottom edge with concave fillets */
 .gwrap{display:flex;flex-direction:column;--pf:color-mix(in srgb,var(--mc) 40%,#17151f)} .gwrap[hidden]{display:none!important}
@@ -109,9 +115,17 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
   <div class="transport"><div class="trow">
     <button id="t-play" class="primary">▶ Play</button><button id="t-loop">Loop</button><button id="t-head0">|◀</button>
     <span class="lbl" id="tp-pos">00.0s</span>
-    <button id="t-fold" style="margin-left:auto"><svg class="eye" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>並べる</button>
+    <button id="t-vid" style="margin-left:auto">映像</button><button id="t-fold"><svg class="eye" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>並べる</button>
   </div>
   <div id="tp-bar"><div id="tp-wa"></div><div id="tp-fill"></div><div id="tp-head"></div></div></div>
+  <section id="vid-sec" hidden>
+    <div class="vwrap" id="vwrap"><video id="vid" playsinline muted loop hidden></video><img id="vimg" alt="" hidden><canvas id="vfx"></canvas>
+      <div class="vempty" id="vempty"><span>写真 / 動画を選ぶ</span><small>iPhone のライブラリからそのまま。音を鳴らすと上に波形が重なります</small></div></div>
+    <div class="row between">
+      <div class="grp"><span class="cap">映像</span><button id="v-pick">選ぶ</button><button id="v-clear">外す</button><input id="v-file" type="file" accept="video/*,image/*" hidden></div>
+      <div class="seg" id="v-style"><button data-vs="none">なし</button><button data-vs="wave" class="on">波形</button><button data-vs="dots">粒</button><button data-vs="ring">輪</button></div>
+    </div>
+  </section>
   <canvas id="stack"></canvas>
   <section id="tl-sec" class="pane" hidden>
     <canvas id="tl"></canvas>
@@ -251,7 +265,7 @@ window._arr={get ac(){return ac},get M(){return M},get clips(){return clips},get
 const wakeTap=()=>{ if(needRebuild){ rebuildAudio(); needRebuild=false; } unlock(); setTimeout(()=>{ if(ac&&ac.state==='running') wakeEl.hidden=true; },150); setTimeout(()=>{ if(ac&&ac.state==='running') wakeEl.hidden=true; else { needRebuild=true; wakeEl.querySelector('div').innerHTML='<b>構成</b><br>もう一度タップ(エンジンを作り直します)'; } },800); };
 wakeEl.addEventListener('touchend',wakeTap,{passive:true}); wakeEl.addEventListener('click',wakeTap);
 /* iOS interrupts the engine when the app goes to the background; coming back it may be suspended, or 'running' but frozen. Detect both and ask for one tap to rebuild. */
-function rebuildAudio(quiet){ try{ if(ac) ac.close(); }catch(e){} ac=null; M=null; proc=null; capNode=null; capSink=null; noiseB=null; bendable.clear(); glPointers.clear(); heldNames.clear(); if(typeof tlPlaying!=='undefined'&&tlPlaying){ playing_nodes=[]; tlPlaying=false; $('#t-play').textContent='▶ Play'; $('#t-play').classList.remove('on'); } if(seq.on) runSeq(false); recording=false; setRecUI(false); if(micJob){ try{ micJob.stop(); }catch(e){} micJob=null; } ensureAudio(); applyDrive(); if(!quiet) toast('音のエンジンを作り直しました'); }
+function rebuildAudio(quiet){ try{ if(ac) ac.close(); }catch(e){} ac=null; M=null; vAn=null; proc=null; capNode=null; capSink=null; noiseB=null; bendable.clear(); glPointers.clear(); heldNames.clear(); if(typeof tlPlaying!=='undefined'&&tlPlaying){ playing_nodes=[]; tlPlaying=false; $('#t-play').textContent='▶ Play'; $('#t-play').classList.remove('on'); } if(seq.on) runSeq(false); recording=false; setRecUI(false); if(micJob){ try{ micJob.stop(); }catch(e){} micJob=null; } ensureAudio(); applyDrive(); if(!quiet) toast('音のエンジンを作り直しました'); }
 let lastCT=-1, stuck=0; setInterval(()=>{ if(!ac) return; if(document.hidden) return; if(ac.state!=='running'){ if(!needRebuild) ac.resume().catch(()=>{}); stuck++; } else if(ac.currentTime===lastCT){ stuck++; } else stuck=0; lastCT=ac.currentTime; if(stuck>=3&&wakeEl.hidden) askWake('音のエンジンが止まりました'); },500);
 function askWake(msg){ needRebuild=true; wakeEl.querySelector('div').innerHTML='<b>構成</b><br>タップして音を起こす<br><small>'+msg+'</small>'; wakeEl.hidden=false; }
 document.addEventListener('visibilitychange',()=>{ if(document.hidden){ wentHidden=true; return; } if(!ac) return; lastCT=-1; stuck=0; if(ac.state!=='running'||wentHidden&&interrupted){ askWake('画面を離れていたので、音のエンジンが止まりました'); } else ac.resume().catch(()=>{}); wentHidden=false; interrupted=false; });
@@ -259,6 +273,21 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden){ wentHidd
 function onRoute(){ if(!ac) return; lastCT=-1; stuck=0; try{ ac.resume(); }catch(e){} setTimeout(()=>{ if(!ac||document.hidden) return; if(ac.state!=='running'&&!needRebuild) askWake('音の出口が切り替わりました'); },700); if(typeof fillSinks==='function') fillSinks(); }
 if(navigator.mediaDevices&&navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange',onRoute);
 let toastT; const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600);};
+let vidOpen=false, vStyle='wave', vAn=null; const vidSec=$('#vid-sec'), vid=$('#vid'), vimg=$('#vimg'), vfx=$('#vfx'), vg=vfx.getContext('2d'); let VW=0,VH=0;
+function setVidOpen(o){ vidOpen=o; vidSec.hidden=!o; $('#t-vid').classList.toggle('on',o); if(o) requestAnimationFrame(vResize); }
+$('#t-vid').onclick=()=>setVidOpen(!vidOpen);
+function vResize(){ const r=vfx.getBoundingClientRect(); if(!r.width) return; const d=Math.min(2,devicePixelRatio||1); VW=r.width; VH=r.height; vfx.width=VW*d; vfx.height=VH*d; vg.setTransform(d,0,0,d,0,0); } new ResizeObserver(vResize).observe(vfx);
+$('#v-pick').onclick=()=>$('#v-file').click(); $('#vempty').onclick=()=>$('#v-file').click();
+$('#v-file').onchange=e=>{ const f=e.target.files[0]; if(!f) return; e.target.value=''; const url=URL.createObjectURL(f); if(f.type.startsWith('video')){ vimg.hidden=true; vid.src=url; vid.hidden=false; vid.play().catch(()=>{}); } else { vid.pause(); vid.hidden=true; vimg.src=url; vimg.hidden=false; } $('#vempty').hidden=true; };
+$('#v-clear').onclick=()=>{ vid.pause(); vid.removeAttribute('src'); vid.load(); vid.hidden=true; vimg.hidden=true; vimg.removeAttribute('src'); $('#vempty').hidden=false; };
+document.querySelectorAll('#v-style button').forEach(b=>b.onclick=()=>{ vStyle=b.dataset.vs; document.querySelectorAll('#v-style button').forEach(x=>x.classList.toggle('on',x===b)); });
+let vDots=[]; function drawVid(){ if(vidSec.hidden||!VW) return; vg.clearRect(0,0,VW,VH); if(vStyle==='none'||!ac||!M) return; if(!vAn){ vAn=ac.createAnalyser(); vAn.fftSize=2048; vAn.smoothingTimeConstant=0.6; M.out.connect(vAn); }
+  const td=new Float32Array(vAn.fftSize); vAn.getFloatTimeDomainData(td); let rms=0; for(let i=0;i<td.length;i++) rms+=td[i]*td[i]; rms=Math.sqrt(rms/td.length); const lv=Math.min(1,rms*6); const col=curCol();
+  if(vStyle==='wave'){ vg.strokeStyle=col; vg.lineWidth=1.5; vg.globalAlpha=0.9; vg.beginPath(); const n=td.length, mid=VH*0.5, amp=VH*0.3; for(let i=0;i<n;i+=4){ const x=i/n*VW, y=mid+td[i]*amp*1.5; i?vg.lineTo(x,y):vg.moveTo(x,y); } vg.stroke(); vg.globalAlpha=0.25; vg.lineWidth=6; vg.stroke(); vg.globalAlpha=1; }
+  else if(vStyle==='dots'){ if(vDots.length<90) for(let i=vDots.length;i<90;i++) vDots.push({x:Math.random(),y:Math.random(),s:0.3+Math.random()*0.7,v:0.0004+Math.random()*0.0012}); vg.fillStyle=col; for(const d of vDots){ d.y-=d.v*(1+lv*6); if(d.y<-0.05){ d.y=1.05; d.x=Math.random(); } const r=(1+lv*5)*d.s; vg.globalAlpha=0.35+0.6*lv*d.s; vg.beginPath(); vg.arc(d.x*VW,d.y*VH,r,0,6.283); vg.fill(); } vg.globalAlpha=1; }
+  else if(vStyle==='ring'){ const cx=VW/2, cy=VH/2, R=Math.min(VW,VH)*0.28; vg.strokeStyle=col; vg.lineWidth=1.5; for(let k=0;k<3;k++){ vg.globalAlpha=0.7-k*0.2; vg.beginPath(); const n=td.length; for(let i=0;i<=n;i+=8){ const a=i/n*6.283, rr=R*(1+k*0.18)+td[i%n]*R*0.9; const x=cx+Math.cos(a)*rr, y=cy+Math.sin(a)*rr; i?vg.lineTo(x,y):vg.moveTo(x,y); } vg.stroke(); } vg.globalAlpha=1; }
+  // a small time code in the corner
+  vg.fillStyle='rgba(255,255,255,0.75)'; vg.font='600 11px '+css('--mono'); vg.textAlign='right'; vg.textBaseline='bottom'; vg.fillText(tlPos().toFixed(1)+'s',VW-12,VH-10); }
 let tlOpen=false; const tlSec=$('#tl-sec'); function setTlOpen(o){ tlOpen=o; tlSec.hidden=!o; $('#stack').hidden=o; $('#t-fold').innerHTML='<svg class="eye" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>'+(o?'並べる':'並べる'); $('#t-fold').style.opacity=o?1:0.75; $('#t-fold').classList.toggle('on',o); if(o) requestAnimationFrame(()=>{ if(typeof tlResize==='function') tlResize(); }); } $('#t-fold').onclick=()=>setTlOpen(!tlOpen); $('#stack').onclick=()=>setTlOpen(true);
 const KEYS=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; let key=0; const hz=m=>440*Math.pow(2,(m-69)/12), root=()=>48+key;
 const P={dark:50,rev:60,tape:50,decay:100,rate:120,vol:85}; const dec=()=>P.decay/100;
@@ -823,7 +852,7 @@ function scheduleClips(ctx,dest,from,now){ const nodes=[]; if(ctx===ac&&M) M.lay
     const foStart=now+(cs+total-fo-from); if(fo>0&&foStart>t0){ g.gain.setValueAtTime(G,foStart); g.gain.linearRampToValueAtTime(0.0001,now+(cs+total-from)); } else if(fo===0){ g.gain.setValueAtTime(0,now+(cs+total-from)); }
     nodes.push(src); } return nodes; }
 function tlPlay(on,at){ ensureAudio(); if(tlPlaying){ playing_nodes.forEach(n=>{try{n.stop();}catch(e){}}); playing_nodes=[]; head=tlPos(); } tlPlaying=on; $('#t-play').textContent=on?'■ Stop':'▶ Play'; $('#t-play').classList.toggle('on',on);
-  if(on){ if(head<wa.s||head>=wa.e-0.05) head=wa.s; tlStartAt=at||ac.currentTime+0.05; tlHeadAt=head; playing_nodes=scheduleClips(ac,M.layBus,head,tlStartAt); } syncTLButtons(); }
+  if(on){ if(head<wa.s||head>=wa.e-0.05) head=wa.s; if(!vid.hidden&&Math.abs(head-wa.s)<0.01){ try{ vid.currentTime=0; vid.play().catch(()=>{}); }catch(e){} } tlStartAt=at||ac.currentTime+0.05; tlHeadAt=head; playing_nodes=scheduleClips(ac,M.layBus,head,tlStartAt); } syncTLButtons(); }
 function restartPlayback(){ if(!tlPlaying) return; const p=tlPos(); playing_nodes.forEach(n=>{try{n.stop();}catch(e){}}); tlStartAt=ac.currentTime+0.02; tlHeadAt=p; playing_nodes=scheduleClips(ac,M.layBus,p,tlStartAt); }
 function tlPos(){ return tlPlaying?tlHeadAt+Math.max(0,ac.currentTime-tlStartAt):head; }
 $('#t-play').onclick=()=>tlPlay(!tlPlaying); $('#t-loop').onclick=()=>{ tlLoop=!tlLoop; $('#t-loop').classList.toggle('on',tlLoop); }; $('#t-head0').onclick=()=>{ if(tlPlaying){ tlPlay(false); head=wa.s; tlPlay(true); } else head=wa.s; };
@@ -930,7 +959,7 @@ async function restoreState(){ if(restored||!ac) return; restored=true;
   build(); applyDrive(); lastLight=lightState(); if(clips.length) toast('前回の続きを復元しました('+clips.length+' クリップ)'); }
 $('#b-newproj').onclick=()=>{ if(!confirm('クリップ・ステップ・設定をすべて消して新規にしますか?')) return; clips=[]; sel=null; for(const st of Object.values(SETS)) st.pads.forEach(p=>{ p.pat.fill(0); p.mute=false; p.solo=false; }); wa={s:0,e:tlLen,full:true}; lanes=lanes.map(()=>({mute:false,solo:false})); hist.length=0; redoS.length=0; updUndo(); $('#r-n').textContent='0'; restartPlayback(); renderClipbar(); build(); clipsDirty=true; saveLight(); saveAudio(); toast('新規にしました'); };
 
-function frame(now){ requestAnimationFrame(frame); tlTick(); drawGlide(); drawSlicer(); g.clearRect(0,0,W,H); g.fillStyle=css('--acc'); g.globalAlpha=0.08; g.fillRect(wa.s/tlLen*W,0,(wa.e-wa.s)/tlLen*W,H); g.globalAlpha=1; const lh=(H-4)/LANES; for(const c of clips){ g.fillStyle=c.color; g.globalAlpha=c.muted?0.25:0.8; g.fillRect(c.start/tlLen*W,2+c.lane*lh,Math.max(2,c.len/tlLen*W),lh-1); } g.globalAlpha=1; g.fillStyle=css('--fg'); g.fillRect(tlPos()/tlLen*W-0.5,0,1,H); if(recording){ g.strokeStyle=css('--rec'); g.strokeRect(0.5,0.5,W-1,H-1); } drawTL(); $('#dsp').textContent='DSP '+String(Math.min(99,10+clips.length*4+(P.rev*0.2|0))).padStart(2,'0')+'%'; }
+function frame(now){ requestAnimationFrame(frame); tlTick(); drawGlide(); drawSlicer(); drawVid(); g.clearRect(0,0,W,H); g.fillStyle=css('--acc'); g.globalAlpha=0.08; g.fillRect(wa.s/tlLen*W,0,(wa.e-wa.s)/tlLen*W,H); g.globalAlpha=1; const lh=(H-4)/LANES; for(const c of clips){ g.fillStyle=c.color; g.globalAlpha=c.muted?0.25:0.8; g.fillRect(c.start/tlLen*W,2+c.lane*lh,Math.max(2,c.len/tlLen*W),lh-1); } g.globalAlpha=1; g.fillStyle=css('--fg'); g.fillRect(tlPos()/tlLen*W-0.5,0,1,H); if(recording){ g.strokeStyle=css('--rec'); g.strokeRect(0.5,0.5,W-1,H-1); } drawTL(); $('#dsp').textContent='DSP '+String(Math.min(99,10+clips.length*4+(P.rev*0.2|0))).padStart(2,'0')+'%'; }
 requestAnimationFrame(frame);
 
 /* ---------- export ---------- */
