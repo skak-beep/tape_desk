@@ -209,7 +209,7 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
     <div class="lbl" id="step-hint" style="text-transform:none;margin:2px 0">行の名前をダブルタップ = その音だけ調整 ・ 長押し = 鳴らす ・ ◉ = 消音 ・ S = ソロ</div>
     <div class="row between" id="step-row">
       <div class="grp"><span class="cap">走らせる</span><button id="b-run" class="primary">▶ Run</button><button id="b-latch" class="on">Latch</button></div>
-      <div class="grp"><span class="cap">消す</span><button id="b-clrpat">この行</button><button id="b-clrall">全部</button></div>
+      <div class="grp"><span class="cap">消す</span><button id="b-clrpat">この行</button><button id="b-clrset">この音源</button><button id="b-clrall">全部</button></div>
       <div class="grp"><span class="cap">クリップに</span><button id="b-seq2clip" class="recbtn">● 録る</button><select id="seq-bars" aria-label="bars"><option value="1">1小節</option><option value="2" selected>2小節</option><option value="4">4小節</option><option value="8">8小節</option></select></div>
       <span id="sel-name" class="lbl" style="display:none"></span>
     </div>
@@ -679,6 +679,7 @@ $('#ed-rev').onclick=()=>{ const p=selPad(); p.p.reverse=!p.p.reverse; $('#ed-re
 $('#ed-close').onclick=()=>{ $('#editor').hidden=true; }; $('#ed-reset').onclick=()=>{ const p=selPad(); const keep={clean:p.p.clean,voice:p.p.voice}; p.p=Object.assign(PP(),keep); openEditor(p); };
 
 $('#b-clrpat').onclick=()=>{ const p=selPad(); p.pat.fill(0); renderGrid(); toast(p.l+' の行を消しました'); };
+$('#b-clrset').onclick=()=>{ const st=SETS[curSet]; if(!st) return; st.pads.forEach(p=>{ p.pat.fill(0); }); renderGrid(); const nm=(INSTR.find(x=>x.id===curSet)||{}).name||curSet; toast(nm+' のステップを全部消しました'); };
 $('#b-clrall').onclick=()=>{ for(const st of Object.values(SETS)) st.pads.forEach(p=>{ p.pat.fill(0); p.mute=false; p.solo=false; }); if(seq.on) runSeq(false); renderGrid(); toast('全セットのステップを消しました'); };
 
 /* ---------- sequencer: every row runs at its own speed ---------- */
