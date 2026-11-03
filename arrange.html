@@ -191,7 +191,8 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
     </div>
     <div class="recbar">
       <button id="b-rec-top" class="recbtn">● Rec</button>
-      <span class="rl"><button data-rl="4">4</button><button data-rl="8" class="on">8</button><button data-rl="15">15</button><button data-rl="30">30</button><button data-rl="0">∞</button></span>
+      <span class="rl" id="rl-sec"><button data-rl="4">4</button><button data-rl="8" class="on">8</button><button data-rl="15">15</button><button data-rl="30">30</button><button data-rl="0">∞</button></span>
+      <span class="rl" id="rl-bars" hidden><button data-bars="1">1</button><button data-bars="2" class="on">2</button><button data-bars="4">4</button><button data-bars="8">8</button></span>
       <button id="b-micclip">● Mic</button><span id="rec-status" class="lbl">READY</span>
     </div>
     <div class="gwrap" id="glide-wrap" hidden>
@@ -210,9 +211,8 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
     <div class="grid" id="grid"></div>
     <div class="lbl" id="step-hint" style="text-transform:none;margin:2px 0">行の名前をダブルタップ = その音だけ調整 ・ 長押し = 鳴らす ・ ◉ = 消音 ・ S = ソロ</div>
     <div class="row between" id="step-row">
-      <div class="grp"><span class="cap">走らせる</span><button id="b-run" class="primary">▶ Run</button><button id="b-latch" class="on">Latch</button></div>
+      <div class="grp" id="run-grp"><button id="b-run" class="primary">▶ Run</button></div>
       <div class="grp"><span class="cap">消す</span><button id="b-clrpat">この行</button><button id="b-clrset">この音源</button><button id="b-clrall">全部</button></div>
-      <div class="grp"><span class="cap">クリップに</span><button id="b-seq2clip" class="recbtn">● 録る</button><select id="seq-bars" aria-label="bars"><option value="1">1小節</option><option value="2" selected>2小節</option><option value="4">4小節</option><option value="8">8小節</option></select></div>
       <span id="sel-name" class="lbl" style="display:none"></span>
     </div>
     <div id="editor" class="editor" hidden>
@@ -709,8 +709,9 @@ function seqTick(){ const ahead=0.1, now=ac.currentTime, sw=+$('#k-swing').value
 function runSeq(on,startAt){ ensureAudio(); seq.on=on; $('#b-run').textContent=on?'■ 停止':'▶ Run'; $('#b-run').classList.toggle('on',on); if(typeof syncPlayBtn==='function') syncPlayBtn(); clearInterval(seq.timer);
   if(on){ const t0=startAt||(playing?loopStart:ac.currentTime+0.05); for(const set of Object.values(SETS)) set.pads.forEach(p=>{ const d=60/P.rate/4/p.mult; const n=Math.max(0,Math.ceil((ac.currentTime+0.02-t0)/d)); p.next=t0+n*d; p.step=n%16; }); seq.timer=setInterval(seqTick,25); } renderGrid(); }
 $('#b-run').onclick=()=>runSeq(!seq.on);
-$('#b-seq2clip').onclick=()=>{ ensureAudio(); if(recording){ rec(false); return; } const bars=+$('#seq-bars').value, len=bars*4*60/P.rate; const hasPat=Object.values(SETS).some(st=>st.pads.some(p=>padOn(p,st)&&p.pat.some(x=>x))); if(!hasPat){ toast('ステップが空です'); return; }
-  const t0=ac.currentTime+0.15; runSeq(false); runSeq(true,t0); rec(true,{len,start:t0,name:'ステップ '+bars+'小節'}); toast(bars+'小節を録音中…'); }; $('#b-latch').onclick=()=>{ latch=!latch; $('#b-latch').classList.toggle('on',latch); };
+let seqBars=2; document.querySelectorAll('#rl-bars button').forEach(b=>b.onclick=()=>{ seqBars=+b.dataset.bars; document.querySelectorAll('#rl-bars button').forEach(x=>x.classList.toggle('on',x===b)); });
+function seq2clip(){ ensureAudio(); if(recording){ rec(false); return; } const bars=seqBars, len=bars*4*60/P.rate; const hasPat=Object.values(SETS).some(st=>st.pads.some(p=>padOn(p,st)&&p.pat.some(x=>x))); if(!hasPat){ toast('ステップが空です'); return; }
+  const t0=ac.currentTime+0.15; runSeq(false); runSeq(true,t0); rec(true,{len,start:t0,name:'ステップ '+bars+'小節'}); toast(bars+'小節を録音中…'); }; 
 
 
 /* ---------- glide surface: a lattice of consonant neighbours; drag = runs of short notes, hold = swell; 2nd finger = bend + tone ---------- */
@@ -962,7 +963,7 @@ function setRecUI(on){ if(!on) bandHide(); const b=$('#b-rec-top'); b.classList.
 let cntTL=null;
 function recWithCount(){ ensureAudio(); if(recording){ rec(false); return; } if(counting){ clearTimeout(countTimer); counting=false; bandHide(); if(cntTL){ head=wa.s; tlPlay(true); cntTL=null; } return; }
   cntTL=tlPlaying?{loop:tlLoop}:null; if(tlPlaying) tlPlay(false); countIn(()=>{ const w=cntTL; cntTL=null; rec(true,{withTL:!!w,loop:w&&w.loop}); },'フレーズ録音まで'); }
-$('#b-rec-top').onclick=recWithCount;
+$('#b-rec-top').onclick=()=>{ if(mode==='step') seq2clip(); else recWithCount(); };
 
 let recName=null, recWithTL=false, recResume=false, recGo=false, recTailS=0, recMainS=0;
 function rec(on,opt){ ensureAudio(); if(on===recording) return; if(on&&typeof slAutoSet==='function'&&slAuto) slAutoSet(false); recording=on; setRecUI(on); opt=opt||{};
@@ -1006,7 +1007,7 @@ function restartPlayback(){ if(!tlPlaying) return; const p=tlPos(); playing_node
 function tlPos(){ return tlPlaying?tlHeadAt+Math.max(0,ac.currentTime-tlStartAt):head; }
 // the top-left Play drives whatever you are looking at: the step sequence while the timeline is folded in step mode, the timeline otherwise
 const seqCtx=()=>!tlOpen&&mode==='step';
-function syncPlayBtn(){ const b=$('#t-play'); if(seqCtx()){ b.textContent=seq.on?'■ Stop':'▶ Play'; b.classList.toggle('on',seq.on); b.title='ステップを走らせる'; } else { b.textContent=tlPlaying?'■ Stop':'▶ Play'; b.classList.toggle('on',tlPlaying); b.title='タイムラインを再生'; } $('#t-loop').style.opacity=seqCtx()?0.35:1; $('#b-run').hidden=!tlOpen; }
+function syncPlayBtn(){ $('#rl-sec').hidden=mode==='step'; $('#rl-bars').hidden=mode!=='step'; $('#run-grp').hidden=!tlOpen||mode!=='step'; const b=$('#t-play'); if(seqCtx()){ b.textContent=seq.on?'■ Stop':'▶ Play'; b.classList.toggle('on',seq.on); b.title='ステップを走らせる'; } else { b.textContent=tlPlaying?'■ Stop':'▶ Play'; b.classList.toggle('on',tlPlaying); b.title='タイムラインを再生'; } $('#t-loop').style.opacity=seqCtx()?0.35:1; $('#b-run').hidden=!tlOpen; }
 $('#t-play').onclick=()=>{ if(seqCtx()) runSeq(!seq.on); else tlPlay(!tlPlaying); }; $('#t-loop').onclick=()=>{ tlLoop=!tlLoop; $('#t-loop').classList.toggle('on',tlLoop); }; $('#t-head0').onclick=()=>{ if(seqCtx()){ if(seq.on){ runSeq(false); runSeq(true); } return; } if(tlPlaying){ tlPlay(false); head=wa.s; tlPlay(true); } else head=wa.s; };
 $('#t-len').onchange=e=>{ tlLen=+e.target.value; if(wa.e>tlLen) wa.e=tlLen; wa.s=Math.min(wa.s,wa.e-1); fitWA(); }; function zoomAt(z,px){ const t=tOf(px); zoom=Math.max(0.5,Math.min(16,z)); scrollX=Math.max(0,Math.min(Math.max(0,tlLen*pxPerSec()-(TW-LH)),t*pxPerSec()-(px-LH))); }
 
@@ -1043,7 +1044,7 @@ function drawTL(){ if(tlSec.hidden) return; if(!TW) tlResize(); tg.clearRect(0,0
   $('#r-pos').textContent=tlPos().toFixed(1).padStart(4,'0'); }
 function tlTick(){ syncTLButtons(); if(!tlPlaying) return; const p=tlPos(); if(p>=wa.e){ if(tlLoop&&!recording){ tlPlay(false); head=wa.s; tlPlay(true); } else { tlPlay(false); head=wa.s; } } $('#r-pos').textContent=tlPos().toFixed(1).padStart(4,'0'); syncTLButtons(); }
 function syncTLButtons(){ const p=tlPos(); $('#tp-pos').textContent=p.toFixed(1).padStart(4,'0')+'s'; const a=Math.max(0.001,wa.e-wa.s), u=Math.max(0,Math.min(1,(p-wa.s)/a)); $('#tp-fill').style.width=(u*100)+'%'; $('#tp-head').style.left='calc('+(u*100)+'% - 1px)'; }
-setInterval(()=>{ const st=$('#rec-status'); if(counting||micJob||micCancel) return; if(recording&&ac){ const el=Math.max(0,ac.currentTime-recStart); const mainLen=recMainS/ac.sampleRate, over=recLen&&el>mainLen; st.textContent=over?'尾を録音中':'● '+el.toFixed(1)+(recLen?'/'+recLen:'')+'s'; st.className='lbl rec'; bandShow(over?'● 余韻を録音中…<small>あと少し — 鳴らし続けなくて大丈夫</small>':'● REC '+el.toFixed(1)+'s'+(recLen?' / '+recLen+'s':'')+'<small>'+(recName||'フレーズを録音中 — もう一度押すと停止')+'</small>'); } else { st.textContent=recLen?recLen+'s':'∞'; st.className='lbl'; } },100);
+setInterval(()=>{ const st=$('#rec-status'); if(counting||micJob||micCancel) return; if(recording&&ac){ const el=Math.max(0,ac.currentTime-recStart); const mainLen=recMainS/ac.sampleRate, over=recLen&&el>mainLen; st.textContent=over?'尾を録音中':'● '+el.toFixed(1)+(recLen?'/'+recLen:'')+'s'; st.className='lbl rec'; bandShow(over?'● 余韻を録音中…<small>あと少し — 鳴らし続けなくて大丈夫</small>':'● REC '+el.toFixed(1)+'s'+(recLen?' / '+recLen+'s':'')+'<small>'+(recName||'フレーズを録音中 — もう一度押すと停止')+'</small>'); } else { st.textContent=mode==='step'?seqBars+'小節 · '+(seqBars*4*60/P.rate).toFixed(1)+'s':(recLen?recLen+'s':'∞'); st.className='lbl'; } },100);
 // pointer interaction: tap = head / select; drag clip = move; drag edge = trim
 let drag=null;
 tl.addEventListener('wheel',e=>{ e.preventDefault(); const r=tl.getBoundingClientRect(); if(e.ctrlKey||e.metaKey) zoomAt(zoom*Math.pow(1.0015,-e.deltaY),e.clientX-r.left); else scrollX=Math.max(0,Math.min(Math.max(0,tlLen*pxPerSec()-(TW-LH)),scrollX+(Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY))); },{passive:false});
