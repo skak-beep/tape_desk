@@ -124,7 +124,7 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
       <div class="vempty" id="vempty"><span>写真 / 動画を選ぶ</span><small>iPhone のライブラリからそのまま。音を鳴らすと上に波形が重なります</small></div></div>
     <div class="row between">
       <div class="grp"><span class="cap">映像</span><button id="v-pick">選ぶ</button><button id="v-clear">外す</button><input id="v-file" type="file" accept="video/*,image/*" hidden></div>
-      <div class="seg" id="v-style"><button data-vs="none">なし</button><button data-vs="punch" class="on">点譜</button><button data-vs="scan">走査線</button><button data-vs="mosaic">格子</button><button data-vs="glow">光</button></div>
+      <div class="seg" id="v-style"><button data-vs="none">なし</button><button data-vs="strata" class="on">譜</button><button data-vs="plan">図面</button><button data-vs="mosaic">格子</button><button data-vs="glow">光</button></div>
     </div>
   </section>
   <canvas id="stack"></canvas>
@@ -274,7 +274,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden){ wentHidd
 function onRoute(){ if(!ac) return; lastCT=-1; stuck=0; try{ ac.resume(); }catch(e){} setTimeout(()=>{ if(!ac||document.hidden) return; if(ac.state!=='running'&&!needRebuild) askWake('音の出口が切り替わりました'); },700); if(typeof fillSinks==='function') fillSinks(); }
 if(navigator.mediaDevices&&navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange',onRoute);
 let toastT; const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600);};
-let vidOpen=false, vStyle='punch', vAn=null; const vidSec=$('#vid-sec'), vid=$('#vid'), vimg=$('#vimg'), vfx=$('#vfx'), vg=vfx.getContext('2d'); let VW=0,VH=0;
+let vidOpen=false, vStyle='strata', vAn=null; const vidSec=$('#vid-sec'), vid=$('#vid'), vimg=$('#vimg'), vfx=$('#vfx'), vg=vfx.getContext('2d'); let VW=0,VH=0;
 function setVidOpen(o){ vidOpen=o; vidSec.hidden=!o; $('#t-vid').classList.toggle('on',o); $('#stack').hidden=o||tlOpen; if(o) requestAnimationFrame(vResize); }
 $('#t-vid').onclick=()=>setVidOpen(!vidOpen);
 function vResize(){ const r=vfx.getBoundingClientRect(); if(!r.width) return; const d=Math.min(2,devicePixelRatio||1); VW=r.width; VH=r.height; vfx.width=VW*d; vfx.height=VH*d; vg.setTransform(d,0,0,d,0,0); } new ResizeObserver(vResize).observe(vfx);
@@ -283,22 +283,30 @@ $('#v-file').onchange=e=>{ const f=e.target.files[0]; if(!f) return; e.target.va
 $('#v-clear').onclick=()=>{ vid.pause(); vid.removeAttribute('src'); vid.load(); vid.hidden=true; vimg.hidden=true; vimg.removeAttribute('src'); $('#vempty').hidden=false; };
 document.querySelectorAll('#v-style button').forEach(b=>b.onclick=()=>{ vStyle=b.dataset.vs; document.querySelectorAll('#v-style button').forEach(x=>x.classList.toggle('on',x===b)); });
 // overlays in the spirit of the reference board: punch-card dot columns, chromatic scanlines, a scrolling mosaic grid — print-like, sparse, annotated
-const VPAL=['#ff5a5f','#4ade80','#f06aa8','#ffd166','#4f8cff','#2fd3e0']; let vBands=null, vHist=[], vScan=[], vFrame=0, vGlow=[];
+const VPAL=['#ff5a5f','#4ade80','#f06aa8','#ffd166','#4f8cff','#2fd3e0']; let vBands=null, vHist=[], vScan=[], vFrame=0, vGlow=[], vLanes=[], vScroll=0, vPlan=[], vPrev=[]; const SPAL=['#f06aa8','#5fd36b','#4aa8ff','#2b2a6b','#45c8d8','#8a8ce0'], PPAL=['#e8603c','#f2c230','#5b9bd5','#7aa88a','#f1b7c6','#222'];
 function vBandsGet(){ const fd=new Uint8Array(vAn.frequencyBinCount); vAn.getByteFrequencyData(fd); const nb=28, out=new Float32Array(nb), sr=ac.sampleRate, bin=sr/vAn.fftSize; for(let k=0;k<nb;k++){ const f0=60*Math.pow(10000/60,k/nb), f1=60*Math.pow(10000/60,(k+1)/nb); let i0=Math.max(1,Math.floor(f0/bin)), i1=Math.max(i0+1,Math.floor(f1/bin)); let m=0; for(let i=i0;i<i1&&i<fd.length;i++) m=Math.max(m,fd[i]); out[k]=Math.max(0,(m/255-0.25)/0.75); } return out; }
 function vStamp(lv){ vg.fillStyle='rgba(255,255,255,0.8)'; vg.font='600 9px '+css('--mono'); vg.textAlign='left'; vg.textBaseline='top'; const nm=(mode==='glide'?instr:(INSTR.find(x=>x.id===curSet)||instr)).name; vg.fillText((KEYS[key]+(keyMajor?' MAJ':' MIN')+' · '+P.rate+' BPM · '+nm).toUpperCase(),12,10); vg.textAlign='right'; vg.textBaseline='bottom'; vg.fillText(tlPos().toFixed(1).padStart(5,'0')+' S',VW-12,VH-10);
   vg.fillStyle='rgba(255,255,255,0.35)'; for(let x=12;x<VW-12;x+=6){ vg.fillRect(x,VH-22,1,(x/6)%5===0?4:2); } }   // a tick ruler like a printed margin
 function drawVid(){ if(vidSec.hidden||!VW) return; vg.clearRect(0,0,VW,VH); if(vStyle==='none'||!ac||!M) return; if(!vAn){ vAn=ac.createAnalyser(); vAn.fftSize=2048; vAn.smoothingTimeConstant=0.72; M.out.connect(vAn); } vFrame++;
   const bands=vBandsGet(); let lv=0; for(const b of bands) lv=Math.max(lv,b); const col=curCol();
-  if(vStyle==='punch'){ // columns of dots: one column per band, dots fill upward with level; colour by column group, a few 'punched' squares
-    const nb=bands.length, left=22, right=VW-22, colW=(right-left)/nb, rows=Math.floor((VH-70)/9), y0=VH-36;
-    for(let k=0;k<nb;k++){ const x=left+colW*(k+0.5), lit=Math.round(bands[k]*rows); const c=k%7===3?VPAL[k%VPAL.length]:col;
-      for(let r=0;r<rows;r++){ const y=y0-r*9; if(r<lit){ vg.fillStyle=c; vg.globalAlpha=0.95; if(r===lit-1&&bands[k]>0.6){ vg.fillRect(x-3,y-3,6,6); } else { vg.beginPath(); vg.arc(x,y,1.8,0,6.283); vg.fill(); } } else { vg.fillStyle='rgba(255,255,255,0.28)'; vg.globalAlpha=1; vg.beginPath(); vg.arc(x,y,0.8,0,6.283); vg.fill(); } } }
+  if(vStyle==='strata'){ // many thin lanes of glyph-runs (ticks, dots, capsules, rings) streaming left; each lane follows one band, the glyph vocabulary follows its energy
+    const NL=18, top=30, bot=VH-34, lh=(bot-top)/NL, step=3, dx=0.9+lv*1.6; vScroll+=dx; while(vScroll>=step){ vScroll-=step; for(let l=0;l<NL;l++){ const L=vLanes[l]||(vLanes[l]={s:[],k:0,c:SPAL[l%SPAL.length],c2:SPAL[(l*5+2)%SPAL.length]}); const er=bands[Math.floor((NL-1-l)/NL*bands.length)]; L.av=(L.av===undefined?er:L.av*0.94+er*0.06); const e=Math.max(0,Math.min(1,(er-L.av)*3+er*0.35)); let k=e<0.22?0:e<0.42?1:e<0.62?2:(e<0.84||er<0.92||L.s.length%7)?3:4; if(k!==L.k&&Math.abs(e-L.le)<0.07) k=L.k; L.k=k; L.le=e; L.s.push({e,k,v:Math.random()}); if(L.s.length>VW/step+4) L.s.shift(); } }
+    for(let l=0;l<NL;l++){ const L=vLanes[l]; if(!L) continue; const y=top+lh*(l+0.5), n=L.s.length; let i=0; while(i<n){ const k=L.s[i].k; let j=i; let emax=0; while(j<n&&L.s[j].k===k){ emax=Math.max(emax,L.s[j].e); j++; } const x0=VW-(n-i)*step-vScroll, x1=VW-(n-j)*step-vScroll; const c=L.s[i].v<0.5?L.c:L.c2;
+        if(k===1){ vg.fillStyle=c; vg.globalAlpha=0.75; for(let q=i;q<j;q++){ const h=3+L.s[q].e*22+(L.s[q].v<0.08?lh*1.6:0); vg.fillRect(x0+(q-i)*step,y-h/2,1,h); } }
+        else if(k===2){ vg.fillStyle=c; vg.globalAlpha=0.95; for(let q=i;q<j;q+=3){ const r=Math.min(lh*0.42,1.2+L.s[q].e*4); vg.beginPath(); vg.arc(x0+(q-i)*step,y,r,0,6.283); vg.fill(); } }
+        else if(k===3){ vg.strokeStyle=c; vg.globalAlpha=0.92; vg.lineCap='round'; vg.lineWidth=Math.min(lh*0.8,4+emax*7); vg.beginPath(); vg.moveTo(x0+3,y); vg.lineTo(Math.max(x0+3.5,x1-3),y); vg.stroke(); if(L.s[i].v<0.5){ vg.fillStyle='rgba(255,255,255,0.55)'; for(let q=i;q<j;q+=2) vg.fillRect(x0+(q-i)*step,y-1,1,2); } }
+        else if(k===4){ vg.lineWidth=1.6; vg.globalAlpha=1; for(let q=i;q<j;q+=4){ const r=Math.min(lh*0.48,2.5+L.s[q].e*4), x=x0+(q-i)*step; vg.beginPath(); vg.arc(x,y,r,0,6.283); if(L.s[q].v<0.4){ vg.fillStyle='#1d1c4e'; vg.fill(); } else { vg.strokeStyle='#1d1c4e'; vg.stroke(); vg.fillStyle=c; vg.beginPath(); vg.arc(x,y,r*0.55,0,6.283); vg.fill(); } } }
+        i=j; } }
     vg.globalAlpha=1; }
-  else if(vStyle==='scan'){ // thin chromatic horizontal lines that stretch with the bands; glitch slices on peaks
-    if(!vScan.length) for(let i=0;i<14;i++) vScan.push({y:Math.random(),c:VPAL[i%VPAL.length],b:Math.floor(Math.random()*28),ph:Math.random()});
-    for(const l of vScan){ const a=bands[l.b], y=Math.round(l.y*VH)+0.5, w=VW*(0.12+a*0.9), x=(Math.sin(vFrame*0.01+l.ph*6.28)*0.5+0.5)*(VW-w); vg.strokeStyle=l.c; vg.globalAlpha=0.25+a*0.7; vg.lineWidth=a>0.7?2:1; vg.beginPath(); vg.moveTo(x,y); vg.lineTo(x+w,y); vg.stroke(); if(a>0.55){ vg.globalAlpha=0.35; vg.fillStyle=l.c; vg.fillRect(x+w-8,y-3,8,6); } }
-    if(lv>0.75&&Math.random()<0.5){ const y=Math.random()*VH, h=4+Math.random()*18; vg.globalAlpha=0.5; vg.drawImage(vfx,0,y,VW,h,(Math.random()-0.5)*30,y,VW,h); }   // smear a strip sideways
-    vg.globalAlpha=1; }
+  else if(vStyle==='plan'){ // a drafting plan: small two-cell chips appear at onsets, hold a thin wire while the note sustains, big blocks on strong lows; everything drifts left
+    const dx=0.8+lv*1.4, top=30, bot=VH-34; const ons=[]; for(let k=0;k<bands.length;k++){ const e=bands[k], d=e-(vPrev[k]||0); if(d>0.22&&e>0.3) ons.push([d,k]); vPrev[k]=e; } ons.sort((a,b)=>b[0]-a[0]); for(const [d,k] of ons.slice(0,3)){ const e=bands[k]; const y=top+(1-k/bands.length)*(bot-top)+(Math.random()-0.5)*(bot-top)/bands.length*4;
+      { const big=k<7&&e>0.85&&Math.random()<0.12&&!vPlan.some(q=>q.big&&q.live); const c=PPAL[Math.floor(Math.random()*PPAL.length)]; vPlan.push({x:VW-4,y,w:big?22+e*36:12+e*10,h:big?16+e*22:7,c,c2:Math.random()<0.5?'#fff':PPAL[Math.floor(Math.random()*PPAL.length)],big,b:k,e0:e,live:true,ex:VW,sl:(Math.random()-0.5)*0.05}); } }
+    for(const q of vPlan){ q.x-=dx; if(q.live){ if(bands[q.b]<q.e0*0.7||q.ex-q.x>VW*0.9) q.live=false; else q.ex=VW; } else q.ex-=dx; }
+    vPlan=vPlan.filter(q=>q.ex>-5); if(vPlan.length>260) vPlan.splice(0,vPlan.length-260);
+    vg.lineWidth=1; for(const q of vPlan){ const L=q.ex-q.x; if(L>q.w+6){ vg.strokeStyle='rgba(20,20,20,0.6)'; vg.beginPath(); vg.moveTo(q.x+q.w,q.y-q.h/2+0.5); vg.lineTo(q.ex,q.y-q.h/2+0.5+L*q.sl); if(q.big||q.c2==='#fff'){ vg.moveTo(q.x+q.w,q.y+q.h/2-0.5); vg.lineTo(q.ex,q.y+q.h/2-0.5+L*q.sl); vg.lineTo(q.ex,q.y-q.h/2+0.5+L*q.sl); } vg.stroke(); }
+      if(q.big){ vg.fillStyle=q.c; vg.globalAlpha=0.9; vg.fillRect(q.x,q.y-q.h/2,q.w,q.h); vg.globalAlpha=1; vg.strokeStyle='rgba(20,20,20,0.85)'; vg.strokeRect(q.x+0.5,q.y-q.h/2+0.5,q.w,q.h); }
+      else { vg.fillStyle=q.c; vg.fillRect(q.x,q.y-q.h/2,q.w/2,q.h); vg.fillStyle=q.c2; vg.fillRect(q.x+q.w/2,q.y-q.h/2,q.w/2,q.h); vg.strokeStyle='rgba(20,20,20,0.9)'; vg.strokeRect(q.x+0.5,q.y-q.h/2+0.5,q.w,q.h); vg.beginPath(); vg.moveTo(q.x+q.w/2+0.5,q.y-q.h/2); vg.lineTo(q.x+q.w/2+0.5,q.y+q.h/2); vg.stroke(); } }
+    vg.fillStyle='rgba(255,255,255,0.12)'; for(let i=0;i<40;i++) vg.fillRect(((i*97+vFrame)%VW),((i*53)%VH),1,1); }
   else if(vStyle==='mosaic'){ // scrolling mosaic: each frame a new column of cells coloured by band energy, sparse like a punched grid
     const cols=36, rowsN=22, cw=(VW-24)/cols, ch=(VH-60)/rowsN; if(vFrame%2===0){ const colc=[]; for(let r=0;r<rowsN;r++){ const b=bands[Math.floor(r/rowsN*bands.length)]; colc.push(b>0.35?(b>0.8?VPAL[(r+vFrame)%VPAL.length]:col):null); } vHist.push(colc); if(vHist.length>cols) vHist.shift(); }
     for(let i=0;i<vHist.length;i++){ const x=12+i*cw; const colc=vHist[i]; for(let r=0;r<rowsN;r++){ const y=24+(rowsN-1-r)*ch; if(colc[r]){ vg.fillStyle=colc[r]; vg.globalAlpha=0.85; vg.fillRect(x+1,y+1,cw-2,ch-2); } else if((i+r)%3===0){ vg.fillStyle='rgba(255,255,255,0.18)'; vg.globalAlpha=1; vg.fillRect(x+cw/2-0.5,y+ch/2-0.5,1,1); } } }
