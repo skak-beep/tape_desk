@@ -28,9 +28,9 @@ body[data-mode=glide]{--mc:#ff7a5a} body[data-mode=step]{--mc:#45a6ff}
 #vid-sec{display:flex;flex-direction:column;gap:2px;position:sticky;top:57px;z-index:5;background:var(--bg);padding-bottom:0} #vid-sec[hidden]{display:none!important}
 .vwrap{position:relative;width:100%;aspect-ratio:16/11.5;max-height:42vh;border-radius:0;overflow:hidden;background:#070708}
 #vid-sec .row{gap:3px;flex-wrap:nowrap} #vid-sec .grp{padding:2px 4px;gap:3px} #vid-sec .grp button,#vid-sec .seg button{min-height:22px;padding:2px 7px;font-size:9px} #v-look button{padding:2px 6px!important} #vid-sec .cap{margin-right:1px;font-size:8px} #v-vol{height:14px}
-.vwrap video,.vwrap img{position:absolute;left:0;right:0;top:0;bottom:20px;width:100%;height:calc(100% - 20px);object-fit:cover;display:block} .vwrap video[hidden],.vwrap img[hidden]{display:none}
+.vwrap video,.vwrap img{position:absolute;left:0;right:0;top:0;bottom:36px;width:100%;height:calc(100% - 36px);object-fit:cover;display:block} .vwrap video[hidden],.vwrap img[hidden]{display:none}
 .vwrap canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-.vempty{position:absolute;left:0;right:0;top:0;bottom:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--dim);text-align:center;padding:20px} .vempty span{color:var(--fg);font-weight:600;letter-spacing:.1em} .vempty small{font-size:10px;line-height:1.6} .vempty[hidden]{display:none}
+.vempty{position:absolute;left:0;right:0;top:0;bottom:36px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--dim);text-align:center;padding:20px} .vempty span{color:var(--fg);font-weight:600;letter-spacing:.1em} .vempty small{font-size:10px;line-height:1.6} .vempty[hidden]{display:none}
 #t-vid.on{background:var(--bg-3);border-color:var(--dim);color:var(--fg)}
 #glide-row>*+*{margin-top:10px}
 /* the surface sits on a filled plate; the active tab is the same plate flowing out of its bottom edge with concave fillets */
@@ -334,7 +334,7 @@ function vAnalyse(){ const src=!vid.hidden&&vid.readyState>=2?vid:(!vimg.hidden&
   const n=48*27; vAvg=[r/n,g/n,b/n]; let bk=0,bc=0; for(const k in q) if(q[k]>bc){ bc=q[k]; bk=+k; } const hx=v=>v.toString(16).padStart(2,'0'); vHex='#'+hx(((bk>>6)&7)*36)+hx(((bk>>3)&7)*36)+hx((bk&7)*36); const ratio=(vAvg[2]+8)/(vAvg[0]+8); vK=Math.round(Math.max(2000,Math.min(12000,5500*Math.pow(ratio,1.4)))/100)*100; return true; }
 function vHUD(lv){ const F='500 7.5px '+css('--mono'), DIM='rgba(255,255,255,0.42)', FG='rgba(255,255,255,0.92)'; vg.font=F; vg.textBaseline='middle';
   // frame: thin white border around the picture, centre ticks on all four sides (viewfinder)
-  vg.fillStyle='rgba(0,0,0,0.3)'; vg.fillRect(0,0,VW,VT); vg.fillStyle='#070708'; vg.fillRect(0,VH-VB,VW,VB); vg.fillStyle='rgba(255,255,255,0.7)'; vg.fillRect(VW/2-0.5,VT-7,1,7); vg.fillRect(VW/2-0.5,VH-VB-7,1,7);
+  vg.fillStyle='rgba(0,0,0,0.3)'; vg.fillRect(0,0,VW,VT); vg.fillStyle='#070708'; vg.fillRect(0,VH-VB,VW,VB); vg.fillStyle='rgba(255,255,255,0.7)'; vg.fillRect(VW/2-0.5,VT-7,1,7); vg.fillRect(VW/2-0.5,VH-VB-16-7,1,7);
   const lab=(x,y,k,v,al)=>{ vg.textAlign=al||'left'; if(al==='right'){ vg.fillStyle=FG; vg.fillText(v,x,y); const w=vg.measureText(v).width; vg.fillStyle=DIM; vg.fillText(k,x-w-5,y); } else { vg.fillStyle=DIM; vg.fillText(k,x,y); const w=vg.measureText(k).width; vg.fillStyle=FG; vg.fillText(v,x+w+5,y); } };
   const ty=VH-VB/2+1, sw=vid.hidden?vimg.naturalWidth:vid.videoWidth, sh=vid.hidden?vimg.naturalHeight:vid.videoHeight, lum=(vAvg[0]*0.3+vAvg[1]*0.59+vAvg[2]*0.11)/255;
   lab(8,ty,'SRC',sw?sw+'×'+sh:'—'); lab(VW*0.34,ty,'LUM',lum.toFixed(2)); lab(VW*0.55,ty,'WB',vK?vK+'K':'—'); vg.textAlign='right'; vg.fillStyle=FG; vg.fillText(vHex.toUpperCase().slice(1),VW-6,ty); vg.fillStyle=vHex; vg.fillRect(VW-52,ty-4,8,8); vg.strokeStyle='rgba(255,255,255,0.4)'; vg.strokeRect(VW-52.5,ty-4.5,9,9);
