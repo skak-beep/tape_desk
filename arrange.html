@@ -124,7 +124,7 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
       <div class="vempty" id="vempty"><span>写真 / 動画を選ぶ</span><small>iPhone のライブラリからそのまま。音を鳴らすと上に波形が重なります</small></div></div>
     <div class="row between">
       <div class="grp"><span class="cap">映像</span><button id="v-pick">選ぶ</button><button id="v-clear">外す</button><input id="v-file" type="file" accept="video/*,image/*" hidden></div>
-      <div class="seg" id="v-style"><button data-vs="none">なし</button><button data-vs="wave" class="on">波形</button><button data-vs="dots">粒</button><button data-vs="ring">輪</button></div>
+      <div class="seg" id="v-style"><button data-vs="none">なし</button><button data-vs="punch" class="on">点譜</button><button data-vs="scan">走査線</button><button data-vs="mosaic">格子</button><button data-vs="glow">光</button></div>
     </div>
   </section>
   <canvas id="stack"></canvas>
@@ -274,7 +274,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden){ wentHidd
 function onRoute(){ if(!ac) return; lastCT=-1; stuck=0; try{ ac.resume(); }catch(e){} setTimeout(()=>{ if(!ac||document.hidden) return; if(ac.state!=='running'&&!needRebuild) askWake('音の出口が切り替わりました'); },700); if(typeof fillSinks==='function') fillSinks(); }
 if(navigator.mediaDevices&&navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange',onRoute);
 let toastT; const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600);};
-let vidOpen=false, vStyle='wave', vAn=null; const vidSec=$('#vid-sec'), vid=$('#vid'), vimg=$('#vimg'), vfx=$('#vfx'), vg=vfx.getContext('2d'); let VW=0,VH=0;
+let vidOpen=false, vStyle='punch', vAn=null; const vidSec=$('#vid-sec'), vid=$('#vid'), vimg=$('#vimg'), vfx=$('#vfx'), vg=vfx.getContext('2d'); let VW=0,VH=0;
 function setVidOpen(o){ vidOpen=o; vidSec.hidden=!o; $('#t-vid').classList.toggle('on',o); $('#stack').hidden=o||tlOpen; if(o) requestAnimationFrame(vResize); }
 $('#t-vid').onclick=()=>setVidOpen(!vidOpen);
 function vResize(){ const r=vfx.getBoundingClientRect(); if(!r.width) return; const d=Math.min(2,devicePixelRatio||1); VW=r.width; VH=r.height; vfx.width=VW*d; vfx.height=VH*d; vg.setTransform(d,0,0,d,0,0); } new ResizeObserver(vResize).observe(vfx);
@@ -282,13 +282,33 @@ $('#v-pick').onclick=()=>$('#v-file').click(); $('#vempty').onclick=()=>$('#v-fi
 $('#v-file').onchange=e=>{ const f=e.target.files[0]; if(!f) return; e.target.value=''; const url=URL.createObjectURL(f); if(f.type.startsWith('video')){ vimg.hidden=true; vid.src=url; vid.hidden=false; vid.play().catch(()=>{}); } else { vid.pause(); vid.hidden=true; vimg.src=url; vimg.hidden=false; } $('#vempty').hidden=true; };
 $('#v-clear').onclick=()=>{ vid.pause(); vid.removeAttribute('src'); vid.load(); vid.hidden=true; vimg.hidden=true; vimg.removeAttribute('src'); $('#vempty').hidden=false; };
 document.querySelectorAll('#v-style button').forEach(b=>b.onclick=()=>{ vStyle=b.dataset.vs; document.querySelectorAll('#v-style button').forEach(x=>x.classList.toggle('on',x===b)); });
-let vDots=[]; function drawVid(){ if(vidSec.hidden||!VW) return; vg.clearRect(0,0,VW,VH); if(vStyle==='none'||!ac||!M) return; if(!vAn){ vAn=ac.createAnalyser(); vAn.fftSize=2048; vAn.smoothingTimeConstant=0.6; M.out.connect(vAn); }
-  const td=new Float32Array(vAn.fftSize); vAn.getFloatTimeDomainData(td); let rms=0; for(let i=0;i<td.length;i++) rms+=td[i]*td[i]; rms=Math.sqrt(rms/td.length); const lv=Math.min(1,rms*6); const col=curCol();
-  if(vStyle==='wave'){ vg.strokeStyle=col; vg.lineWidth=1.5; vg.globalAlpha=0.9; vg.beginPath(); const n=td.length, mid=VH*0.5, amp=VH*0.3; for(let i=0;i<n;i+=4){ const x=i/n*VW, y=mid+td[i]*amp*1.5; i?vg.lineTo(x,y):vg.moveTo(x,y); } vg.stroke(); vg.globalAlpha=0.25; vg.lineWidth=6; vg.stroke(); vg.globalAlpha=1; }
-  else if(vStyle==='dots'){ if(vDots.length<90) for(let i=vDots.length;i<90;i++) vDots.push({x:Math.random(),y:Math.random(),s:0.3+Math.random()*0.7,v:0.0004+Math.random()*0.0012}); vg.fillStyle=col; for(const d of vDots){ d.y-=d.v*(1+lv*6); if(d.y<-0.05){ d.y=1.05; d.x=Math.random(); } const r=(1+lv*5)*d.s; vg.globalAlpha=0.35+0.6*lv*d.s; vg.beginPath(); vg.arc(d.x*VW,d.y*VH,r,0,6.283); vg.fill(); } vg.globalAlpha=1; }
-  else if(vStyle==='ring'){ const cx=VW/2, cy=VH/2, R=Math.min(VW,VH)*0.28; vg.strokeStyle=col; vg.lineWidth=1.5; for(let k=0;k<3;k++){ vg.globalAlpha=0.7-k*0.2; vg.beginPath(); const n=td.length; for(let i=0;i<=n;i+=8){ const a=i/n*6.283, rr=R*(1+k*0.18)+td[i%n]*R*0.9; const x=cx+Math.cos(a)*rr, y=cy+Math.sin(a)*rr; i?vg.lineTo(x,y):vg.moveTo(x,y); } vg.stroke(); } vg.globalAlpha=1; }
-  // a small time code in the corner
-  vg.fillStyle='rgba(255,255,255,0.75)'; vg.font='600 11px '+css('--mono'); vg.textAlign='right'; vg.textBaseline='bottom'; vg.fillText(tlPos().toFixed(1)+'s',VW-12,VH-10); }
+// overlays in the spirit of the reference board: punch-card dot columns, chromatic scanlines, a scrolling mosaic grid — print-like, sparse, annotated
+const VPAL=['#ff5a5f','#4ade80','#f06aa8','#ffd166','#4f8cff','#2fd3e0']; let vBands=null, vHist=[], vScan=[], vFrame=0, vGlow=[];
+function vBandsGet(){ const fd=new Uint8Array(vAn.frequencyBinCount); vAn.getByteFrequencyData(fd); const nb=28, out=new Float32Array(nb), sr=ac.sampleRate, bin=sr/vAn.fftSize; for(let k=0;k<nb;k++){ const f0=60*Math.pow(10000/60,k/nb), f1=60*Math.pow(10000/60,(k+1)/nb); let i0=Math.max(1,Math.floor(f0/bin)), i1=Math.max(i0+1,Math.floor(f1/bin)); let m=0; for(let i=i0;i<i1&&i<fd.length;i++) m=Math.max(m,fd[i]); out[k]=Math.max(0,(m/255-0.25)/0.75); } return out; }
+function vStamp(lv){ vg.fillStyle='rgba(255,255,255,0.8)'; vg.font='600 9px '+css('--mono'); vg.textAlign='left'; vg.textBaseline='top'; const nm=(mode==='glide'?instr:(INSTR.find(x=>x.id===curSet)||instr)).name; vg.fillText((KEYS[key]+(keyMajor?' MAJ':' MIN')+' · '+P.rate+' BPM · '+nm).toUpperCase(),12,10); vg.textAlign='right'; vg.textBaseline='bottom'; vg.fillText(tlPos().toFixed(1).padStart(5,'0')+' S',VW-12,VH-10);
+  vg.fillStyle='rgba(255,255,255,0.35)'; for(let x=12;x<VW-12;x+=6){ vg.fillRect(x,VH-22,1,(x/6)%5===0?4:2); } }   // a tick ruler like a printed margin
+function drawVid(){ if(vidSec.hidden||!VW) return; vg.clearRect(0,0,VW,VH); if(vStyle==='none'||!ac||!M) return; if(!vAn){ vAn=ac.createAnalyser(); vAn.fftSize=2048; vAn.smoothingTimeConstant=0.72; M.out.connect(vAn); } vFrame++;
+  const bands=vBandsGet(); let lv=0; for(const b of bands) lv=Math.max(lv,b); const col=curCol();
+  if(vStyle==='punch'){ // columns of dots: one column per band, dots fill upward with level; colour by column group, a few 'punched' squares
+    const nb=bands.length, left=22, right=VW-22, colW=(right-left)/nb, rows=Math.floor((VH-70)/9), y0=VH-36;
+    for(let k=0;k<nb;k++){ const x=left+colW*(k+0.5), lit=Math.round(bands[k]*rows); const c=k%7===3?VPAL[k%VPAL.length]:col;
+      for(let r=0;r<rows;r++){ const y=y0-r*9; if(r<lit){ vg.fillStyle=c; vg.globalAlpha=0.95; if(r===lit-1&&bands[k]>0.6){ vg.fillRect(x-3,y-3,6,6); } else { vg.beginPath(); vg.arc(x,y,1.8,0,6.283); vg.fill(); } } else { vg.fillStyle='rgba(255,255,255,0.28)'; vg.globalAlpha=1; vg.beginPath(); vg.arc(x,y,0.8,0,6.283); vg.fill(); } } }
+    vg.globalAlpha=1; }
+  else if(vStyle==='scan'){ // thin chromatic horizontal lines that stretch with the bands; glitch slices on peaks
+    if(!vScan.length) for(let i=0;i<14;i++) vScan.push({y:Math.random(),c:VPAL[i%VPAL.length],b:Math.floor(Math.random()*28),ph:Math.random()});
+    for(const l of vScan){ const a=bands[l.b], y=Math.round(l.y*VH)+0.5, w=VW*(0.12+a*0.9), x=(Math.sin(vFrame*0.01+l.ph*6.28)*0.5+0.5)*(VW-w); vg.strokeStyle=l.c; vg.globalAlpha=0.25+a*0.7; vg.lineWidth=a>0.7?2:1; vg.beginPath(); vg.moveTo(x,y); vg.lineTo(x+w,y); vg.stroke(); if(a>0.55){ vg.globalAlpha=0.35; vg.fillStyle=l.c; vg.fillRect(x+w-8,y-3,8,6); } }
+    if(lv>0.75&&Math.random()<0.5){ const y=Math.random()*VH, h=4+Math.random()*18; vg.globalAlpha=0.5; vg.drawImage(vfx,0,y,VW,h,(Math.random()-0.5)*30,y,VW,h); }   // smear a strip sideways
+    vg.globalAlpha=1; }
+  else if(vStyle==='mosaic'){ // scrolling mosaic: each frame a new column of cells coloured by band energy, sparse like a punched grid
+    const cols=36, rowsN=22, cw=(VW-24)/cols, ch=(VH-60)/rowsN; if(vFrame%2===0){ const colc=[]; for(let r=0;r<rowsN;r++){ const b=bands[Math.floor(r/rowsN*bands.length)]; colc.push(b>0.35?(b>0.8?VPAL[(r+vFrame)%VPAL.length]:col):null); } vHist.push(colc); if(vHist.length>cols) vHist.shift(); }
+    for(let i=0;i<vHist.length;i++){ const x=12+i*cw; const colc=vHist[i]; for(let r=0;r<rowsN;r++){ const y=24+(rowsN-1-r)*ch; if(colc[r]){ vg.fillStyle=colc[r]; vg.globalAlpha=0.85; vg.fillRect(x+1,y+1,cw-2,ch-2); } else if((i+r)%3===0){ vg.fillStyle='rgba(255,255,255,0.18)'; vg.globalAlpha=1; vg.fillRect(x+cw/2-0.5,y+ch/2-0.5,1,1); } } }
+    vg.globalAlpha=1; }
+  else if(vStyle==='glow'){ // a chain of soft spectral blobs across the middle, warm to cool, sliced by faint vertical cuts (the Naumann / PolyAI board)
+    const nblob=9, cy=VH*0.5, span=VW*0.86, x0=VW*0.07; vg.globalCompositeOperation='lighter';
+    for(let i=0;i<nblob;i++){ let a=0; const b0=Math.floor(i/nblob*bands.length), b1=Math.floor((i+1)/nblob*bands.length); for(let k=b0;k<b1;k++) a=Math.max(a,bands[k]); const sm=(vGlow[i]=(vGlow[i]||0)*0.8+a*0.2); const x=x0+span*(i+0.5)/nblob, rx=14+sm*VW*0.09, ry=10+sm*VH*0.42; const hue=20+i/(nblob-1)*230;
+      const g=vg.createRadialGradient(0,0,0,0,0,1); g.addColorStop(0,`hsla(${hue} 95% 70% / ${0.55+sm*0.4})`); g.addColorStop(0.55,`hsla(${hue+25} 90% 60% / ${0.25+sm*0.3})`); g.addColorStop(1,`hsla(${hue+40} 90% 55% / 0)`); vg.save(); vg.translate(x,cy); vg.scale(rx,ry); vg.fillStyle=g; vg.beginPath(); vg.arc(0,0,1,0,6.283); vg.fill(); vg.restore(); }
+    vg.globalCompositeOperation='source-over'; vg.fillStyle='rgba(0,0,0,0.22)'; for(let x=x0;x<x0+span;x+=9) vg.fillRect(x,cy-VH*0.46,1.2,VH*0.92); }
+  vStamp(lv); }
 let tlOpen=false; const tlSec=$('#tl-sec'); function setTlOpen(o){ tlOpen=o; tlSec.hidden=!o; $('#stack').hidden=o||vidOpen; $('#t-fold').innerHTML='<svg class="eye" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>'+(o?'並べる':'並べる'); $('#t-fold').style.opacity=o?1:0.75; $('#t-fold').classList.toggle('on',o); if(o) requestAnimationFrame(()=>{ if(typeof tlResize==='function') tlResize(); }); } $('#t-fold').onclick=()=>setTlOpen(!tlOpen); $('#stack').onclick=()=>setTlOpen(true);
 const KEYS=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; let key=0; const hz=m=>440*Math.pow(2,(m-69)/12), root=()=>48+key;
 const P={dark:50,rev:60,tape:50,decay:100,rate:120,vol:85}; const dec=()=>P.decay/100;
