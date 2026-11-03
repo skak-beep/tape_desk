@@ -427,7 +427,7 @@ function drawStyle(){
       else if(g.geo===2){ vg.fillRect(x-r*2.4,y-0.25,r*4.8,0.5); for(let i=-3;i<=3;i++) vg.fillRect(x+i*r*0.8-0.25,y-(i%3===0?4:2),0.5,(i%3===0?8:4)); }
       else { vg.fillRect(x-0.25,y-r*1.4,0.5,r*2.8); vg.fillRect(x-r*1.4,y-0.25,r*2.8,0.5); vg.beginPath(); vg.arc(x,y,r*0.35,0,6.283); vg.stroke(); } } }
   }
-let tlOpen=false; const tlSec=$('#tl-sec'); function setTlOpen(o){ tlOpen=o; tlSec.hidden=!o; $('#stack').hidden=o||vidOpen; $('#t-fold').innerHTML='<svg class="eye" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>'+(o?'並べる':'並べる'); $('#t-fold').style.opacity=o?1:0.75; $('#t-fold').classList.toggle('on',o); if(o) requestAnimationFrame(()=>{ if(typeof tlResize==='function') tlResize(); }); } $('#t-fold').onclick=()=>setTlOpen(!tlOpen); $('#stack').onclick=()=>setTlOpen(true);
+let tlOpen=false; const tlSec=$('#tl-sec'); function setTlOpen(o){ tlOpen=o; tlSec.hidden=!o; $('#stack').hidden=o||vidOpen; $('#t-fold').innerHTML='<svg class="eye" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>'+(o?'畳む':'並べる'); $('#t-fold').style.opacity=o?1:0.75; $('#t-fold').classList.toggle('on',o); if(o) requestAnimationFrame(()=>{ if(typeof tlResize==='function') tlResize(); }); if(typeof syncPlayBtn==='function') syncPlayBtn(); } $('#t-fold').onclick=()=>setTlOpen(!tlOpen); $('#stack').onclick=()=>setTlOpen(true);
 const KEYS=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; let key=0; const hz=m=>440*Math.pow(2,(m-69)/12), root=()=>48+key;
 const P={dark:50,rev:60,tape:50,decay:100,rate:120,vol:85}; const dec=()=>P.decay/100;
 let loopLen=30, loopStart=0, playing=false, layers=[], sample=null, sampleRev=null, curSet='drums', autoOn=false;
@@ -661,7 +661,7 @@ let selected={set:'drums',idx:0}, editMode=false, latch=true; let mode='glide'; 
 const gridEl=$('#grid'), padsEl=$('#pads'); const heldCells=new Set();
 const dbl=(el,fn)=>{ let t=0; el.addEventListener('pointerdown',e=>{ const n=performance.now(); if(n-t<380){ t=0; fn(e); } else t=n; }); };
 const MULTS=[0.25,0.5,1,2,4], multLabel=m=>m===0.25?'¼':m===0.5?'½':'×'+m;
-function build(){ document.body.dataset.mode=mode; document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('on',b.dataset.mode===mode)); INSTR.forEach(it=>{ if(it.kind==='p') SETS[it.id].pads.forEach((p,i)=>p.l=KEYS[(key+PENTA[i])%12]); });
+function build(){ document.body.dataset.mode=mode; if(typeof syncPlayBtn==='function') setTimeout(syncPlayBtn,0); document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('on',b.dataset.mode===mode)); INSTR.forEach(it=>{ if(it.kind==='p') SETS[it.id].pads.forEach((p,i)=>p.l=KEYS[(key+PENTA[i])%12]); });
   const isGlide=mode==='glide'; $('#glide').hidden=!isGlide; $('#glide-wrap').hidden=!isGlide; $('#glide-row').hidden=!isGlide; gridEl.hidden=isGlide; $('#step-row').hidden=isGlide; $('#step-hint').hidden=isGlide; padsEl.hidden=isGlide; if(isGlide){ $('#editor').hidden=true; requestAnimationFrame(glResize); } else if(editMode) openEditor(selPad()); renderInstr();
   gridEl.innerHTML=''; padsEl.innerHTML='';
   SETS[curSet].pads.forEach((p,i)=>{
@@ -705,7 +705,7 @@ const seq={on:false,timer:null};
 function trig(p,v,pn,t){ const stop=p.f(v,pn,p.p,t); const wait=Math.max(0,(t-ac.currentTime)*1000); if(stop) setTimeout(stop,wait+60/P.rate*1000*0.9/p.mult); }
 function seqTick(){ const ahead=0.1, now=ac.currentTime, sw=+$('#k-swing').value*0.5; for(const set of Object.values(SETS)) set.pads.forEach((p,i)=>{ if(p.next===undefined||p.next<now-1){ p.next=now+0.02; p.step=0; }
     const d=60/P.rate/4/p.mult; while(p.next<now+ahead){ const k=p.step; const heldHere=set===SETS[curSet]&&heldCells.has(i+':'+k); if((p.pat[k]&&padOn(p,set))||heldHere) trig(p,p.p.vel,(i%4-1.5)/1.5*0.5,p.next); p.next+=(k%2===0)?d*(1+sw):d*(1-sw); p.step=(k+1)%16; } }); renderGrid(); }
-function runSeq(on,startAt){ ensureAudio(); seq.on=on; $('#b-run').textContent=on?'■ 停止':'▶ Run'; $('#b-run').classList.toggle('on',on); clearInterval(seq.timer);
+function runSeq(on,startAt){ ensureAudio(); seq.on=on; $('#b-run').textContent=on?'■ 停止':'▶ Run'; $('#b-run').classList.toggle('on',on); if(typeof syncPlayBtn==='function') syncPlayBtn(); clearInterval(seq.timer);
   if(on){ const t0=startAt||(playing?loopStart:ac.currentTime+0.05); for(const set of Object.values(SETS)) set.pads.forEach(p=>{ const d=60/P.rate/4/p.mult; const n=Math.max(0,Math.ceil((ac.currentTime+0.02-t0)/d)); p.next=t0+n*d; p.step=n%16; }); seq.timer=setInterval(seqTick,25); } renderGrid(); }
 $('#b-run').onclick=()=>runSeq(!seq.on);
 $('#b-seq2clip').onclick=()=>{ ensureAudio(); if(recording){ rec(false); return; } const bars=+$('#seq-bars').value, len=bars*4*60/P.rate; const hasPat=Object.values(SETS).some(st=>st.pads.some(p=>padOn(p,st)&&p.pat.some(x=>x))); if(!hasPat){ toast('ステップが空です'); return; }
@@ -999,11 +999,14 @@ function scheduleClips(ctx,dest,from,now){ const nodes=[]; if(ctx===ac&&M) M.lay
     g.gain.setValueAtTime(0.0001,t0); if(skip<fi) g.gain.linearRampToValueAtTime(G,now+(cs+fi-from)); else g.gain.setValueAtTime(G,t0);
     const foStart=now+(cs+total-fo-from); if(fo>0&&foStart>t0){ g.gain.setValueAtTime(G,foStart); g.gain.linearRampToValueAtTime(0.0001,now+(cs+total-from)); } else if(fo===0){ g.gain.setValueAtTime(0,now+(cs+total-from)); }
     nodes.push(src); } return nodes; }
-function tlPlay(on,at){ ensureAudio(); if(tlPlaying){ playing_nodes.forEach(n=>{try{n.stop();}catch(e){}}); playing_nodes=[]; head=tlPos(); } tlPlaying=on; $('#t-play').textContent=on?'■ Stop':'▶ Play'; $('#t-play').classList.toggle('on',on);
+function tlPlay(on,at){ ensureAudio(); if(tlPlaying){ playing_nodes.forEach(n=>{try{n.stop();}catch(e){}}); playing_nodes=[]; head=tlPos(); } tlPlaying=on; if(typeof syncPlayBtn==='function') syncPlayBtn(); else { $('#t-play').textContent=on?'■ Stop':'▶ Play'; $('#t-play').classList.toggle('on',on); }
   if(on){ if(head<wa.s||head>=wa.e-0.05) head=wa.s; if(!vid.hidden&&Math.abs(head-wa.s)<0.01){ try{ vid.currentTime=0; vid.play().catch(()=>{}); }catch(e){} } tlStartAt=at||ac.currentTime+0.05; tlHeadAt=head; playing_nodes=scheduleClips(ac,M.layBus,head,tlStartAt); } syncTLButtons(); }
 function restartPlayback(){ if(!tlPlaying) return; const p=tlPos(); playing_nodes.forEach(n=>{try{n.stop();}catch(e){}}); tlStartAt=ac.currentTime+0.02; tlHeadAt=p; playing_nodes=scheduleClips(ac,M.layBus,p,tlStartAt); }
 function tlPos(){ return tlPlaying?tlHeadAt+Math.max(0,ac.currentTime-tlStartAt):head; }
-$('#t-play').onclick=()=>tlPlay(!tlPlaying); $('#t-loop').onclick=()=>{ tlLoop=!tlLoop; $('#t-loop').classList.toggle('on',tlLoop); }; $('#t-head0').onclick=()=>{ if(tlPlaying){ tlPlay(false); head=wa.s; tlPlay(true); } else head=wa.s; };
+// the top-left Play drives whatever you are looking at: the step sequence while the timeline is folded in step mode, the timeline otherwise
+const seqCtx=()=>!tlOpen&&mode==='step';
+function syncPlayBtn(){ const b=$('#t-play'); if(seqCtx()){ b.textContent=seq.on?'■ Stop':'▶ Play'; b.classList.toggle('on',seq.on); b.title='ステップを走らせる'; } else { b.textContent=tlPlaying?'■ Stop':'▶ Play'; b.classList.toggle('on',tlPlaying); b.title='タイムラインを再生'; } $('#t-loop').style.opacity=seqCtx()?0.35:1; $('#b-run').hidden=!tlOpen; }
+$('#t-play').onclick=()=>{ if(seqCtx()) runSeq(!seq.on); else tlPlay(!tlPlaying); }; $('#t-loop').onclick=()=>{ tlLoop=!tlLoop; $('#t-loop').classList.toggle('on',tlLoop); }; $('#t-head0').onclick=()=>{ if(seqCtx()){ if(seq.on){ runSeq(false); runSeq(true); } return; } if(tlPlaying){ tlPlay(false); head=wa.s; tlPlay(true); } else head=wa.s; };
 $('#t-len').onchange=e=>{ tlLen=+e.target.value; if(wa.e>tlLen) wa.e=tlLen; wa.s=Math.min(wa.s,wa.e-1); fitWA(); }; function zoomAt(z,px){ const t=tOf(px); zoom=Math.max(0.5,Math.min(16,z)); scrollX=Math.max(0,Math.min(Math.max(0,tlLen*pxPerSec()-(TW-LH)),t*pxPerSec()-(px-LH))); }
 
 
