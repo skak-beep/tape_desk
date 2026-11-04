@@ -1058,16 +1058,17 @@ const DNR=28, DNC=32; const dcv=$('#dcv'), dg=dcv.getContext('2d'); let DW=0,DH=
 function drResize(){ const r=dcv.getBoundingClientRect(); if(!r.width) return; const d=Math.min(1.5,devicePixelRatio||1); DW=r.width; DH=Math.round(DW/DNC*DNR); dcv.style.height=DH+'px'; dcv.width=Math.round(DW*d); dcv.height=Math.round(DH*d); dg.setTransform(d,0,0,d,0,0); dbk.width=Math.round(DW/2); dbk.height=Math.round(DH/2); dbkT=0; }
 const drLoopLen=()=>seqBars*4*60/P.rate; const drCols=()=>DNC;
 function drSemi(row){ const sc=SC[glScale], L=sc.length; return 12*Math.floor(row/L)+sc[row%L]-12-(L<=5?12:0); } /* 28 rows: pentatonic spans 5½ octaves so it starts an octave lower to keep the middle rows mid-range */
-function drHit(ci,row,col,at){ const it=INSTR.find(i=>i.id===dr.pal[ci].id)||INSTR[0], pn=((col+0.5)/drCols()-0.5)*0.9, v=0.72;
-  if(it.kind==='p') playVoice(it,drSemi(row),v,pn,PP(),at);
-  else if(it.kind==='d') drumHit(3,row%6,v,pn,macPPi(it,{voice:undefined}),at);
-  else if(it.kind==='x') popGroup(row%6,0.6,0.5,pn,macPPi(it,{voice:undefined}),at);
-  else if(it.kind==='g'){ if(sample) atCall(at,()=>grain(Math.min(Math.max(0,slices.length-1),row%Math.max(1,slices.length)),v,pn,macPPi(it,{voice:undefined,glide:false}))); }
+/* lv: level share for this hit. Cells stacked in one column play together, so each gets 1/√n of the room (a 4-note stack is ~6 dB per note quieter) and the whole drawing sits at 0.75 — chords stop hitting the limiter. */
+function drHit(ci,row,col,at,lv){ const it=INSTR.find(i=>i.id===dr.pal[ci].id)||INSTR[0], pn=((col+0.5)/drCols()-0.5)*0.9, v=0.7; lv=lv||0.75; const pp=Object.assign(PP(),{level:lv});
+  if(it.kind==='p') playVoice(it,drSemi(row),v,pn,pp,at);
+  else if(it.kind==='d') drumHit(3,row%6,v*0.9,pn,macPPi(it,{voice:undefined,level:lv}),at);
+  else if(it.kind==='x') popGroup(row%6,0.6,0.5,pn,macPPi(it,{voice:undefined,level:lv}),at);
+  else if(it.kind==='g'){ if(sample) atCall(at,()=>grain(Math.min(Math.max(0,slices.length-1),row%Math.max(1,slices.length)),v,pn,macPPi(it,{voice:undefined,glide:false,level:lv}))); }
   else if(it.kind==='n') atCall(at,()=>{ const keep=instr; instr=it; try{ glNote(3,row%6,v,true); }finally{ instr=keep; } }); }
 const drKey=(c,r)=>c+':'+r;
-function drRebuild(){ const ev=[]; for(const [k,cell] of dr.cells){ ev.push({t:cell.c/drCols(),row:cell.r,col:cell.c,ci:cell.ci,k}); } ev.sort((a,b)=>a.t-b.t||a.row-b.row); dr.ev=ev; }
+function drRebuild(){ const ev=[], cnt=new Map(); for(const cell of dr.cells.values()) cnt.set(cell.c,(cnt.get(cell.c)||0)+1); for(const [k,cell] of dr.cells){ ev.push({t:cell.c/drCols(),row:cell.r,col:cell.c,ci:cell.ci,k,lv:0.7/Math.pow(cnt.get(cell.c)||1,0.6)}); } ev.sort((a,b)=>a.t-b.t||a.row-b.row); dr.ev=ev; }
 function drTick(){ if(!dr.on||!ac) return; const now=ac.currentTime, ahead=0.12, len=drLoopLen(); if(dr.len!==len){ const ph=(now-dr.t0)/dr.len; dr.len=len; dr.t0=now-ph*len; }
-  let guard=0; while(guard++<600){ if(dr.i>=dr.ev.length){ if(dr.t0+len>now+ahead) break; dr.t0+=len; dr.i=0; if(!dr.ev.length) break; continue; } const e=dr.ev[dr.i], at=dr.t0+e.t*len; if(at>now+ahead) break; if(at>=now-0.05){ drHit(e.ci,e.row,e.col,at); const cell=dr.cells.get(e.k); if(cell) setTimeout(()=>{ cell.lit=performance.now(); dr.lastHit=cell.lit; },Math.max(0,(at-now)*1000)); } dr.i++; } }
+  let guard=0; while(guard++<600){ if(dr.i>=dr.ev.length){ if(dr.t0+len>now+ahead) break; dr.t0+=len; dr.i=0; if(!dr.ev.length) break; continue; } const e=dr.ev[dr.i], at=dr.t0+e.t*len; if(at>now+ahead) break; if(at>=now-0.05){ drHit(e.ci,e.row,e.col,at,e.lv); const cell=dr.cells.get(e.k); if(cell) setTimeout(()=>{ cell.lit=performance.now(); dr.lastHit=cell.lit; },Math.max(0,(at-now)*1000)); } dr.i++; } }
 function drRun(on,startAt){ ensureAudio(); dr.on=on; clearInterval(dr.timer); if(on){ drRebuild(); dr.len=drLoopLen(); dr.t0=startAt||ac.currentTime+0.05; dr.i=0; dr.timer=setInterval(drTick,25); drAnim(); } if(typeof syncPlayBtn==='function') syncPlayBtn(); drRender(); }
 function draw2clip(){ ensureAudio(); if(recording){ rec(false); return; } if(!dr.cells.size){ toast('まだ何も描いていません'); return; } const len=drLoopLen(); const t0=ac.currentTime+0.15; drRun(false); drRun(true,t0); rec(true,{len,start:t0,name:'描く '+seqBars+'小節'}); toast(seqBars+'小節を録音中…'); }
 let drRaf=0; function drAnim(){ cancelAnimationFrame(drRaf); const f=()=>{ drRender(); if(dr.on||dr.cur||performance.now()-dr.lastHit<500||drHasVideo()) drRaf=requestAnimationFrame(f); }; drRaf=requestAnimationFrame(f); }
