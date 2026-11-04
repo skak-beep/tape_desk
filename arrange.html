@@ -1085,9 +1085,9 @@ function tlPos(){ return tlPlaying?tlHeadAt+Math.max(0,ac.currentTime-tlStartAt)
 
 /* ---------- 描く: a pixel score over your own footage. Cells = notes. The line sweeps left→right in time with the BPM;
    x = when (16ths), y = which note of the current scale (3 octaves from C3), colour = which instrument. ---------- */
-const DRNAME=['若葉','珊瑚','藤','琥珀','藍','薔薇','空','墨'];
+const DRNAME=['若葉','珊瑚','藤','琥珀','藍','薔薇','空','生成'];
 const dr={on:false,timer:null,t0:0,len:0,ev:[],i:0,cells:new Map(),cur:null,tool:'pen',col:0,undo:[],lastHit:0,bg:(()=>{ try{ return localStorage.getItem('td_drbg')!=='0'; }catch(e){ return true; } })(),grid:(()=>{ try{ return localStorage.getItem('td_drgrid')!=='0'; }catch(e){ return true; } })(),
-  pal:[{c:'#8fd0a8',id:'vpiano',g:1},{c:'#ff8a70',id:'ping',g:1},{c:'#b7a6ff',id:'piron',g:1},{c:'#ffc45c',id:'fuwa',g:1},{c:'#5f7cff',id:'ep',g:1},{c:'#ff9ac4',id:'pluck',g:1},{c:'#9fdcff',id:'bass',g:1},{c:'#1f1d24',id:'drums',g:1}]};
+  pal:[{c:'#8fd0a8',id:'vpiano',g:1},{c:'#ff8a70',id:'ping',g:1},{c:'#b7a6ff',id:'piron',g:1},{c:'#ffc45c',id:'fuwa',g:1},{c:'#5f7cff',id:'ep',g:1},{c:'#ff9ac4',id:'pluck',g:1},{c:'#9fdcff',id:'bass',g:1},{c:'#f3e7c9',id:'drums',g:1}]};
 let DNR=28; const DNC=32; const dcv=$('#dcv'), dg=dcv.getContext('2d'); let DW=0,DH=0; const dbk=document.createElement('canvas'), dbg=dbk.getContext('2d'); let dbkT=0, drLastF=0; const drr=(x,y,w,h,r)=>{ dg.beginPath(); if(dg.roundRect) dg.roundRect(x,y,Math.max(0,w),Math.max(0,h),r); else dg.rect(x,y,Math.max(0,w),Math.max(0,h)); };
 const drOver=()=>dcv.parentElement&&dcv.parentElement.id==='vwrap';
 function drResize(){ const d=Math.min(1.5,devicePixelRatio||1); if(drOver()){ if(!VW) vResize(); if(!VW) return; DW=VW; const cell=DW/DNC; DNR=Math.max(12,Math.min(28,Math.floor((VH-VT-VB-VSTRIP)/cell))); DH=Math.round(DNR*cell); dcv.style.setProperty('--dtop',VT+'px'); dcv.style.setProperty('--dh',DH+'px'); } else { const r=dcv.getBoundingClientRect(); if(!r.width) return; DNR=28; DW=r.width; DH=Math.round(DW/DNC*DNR); dcv.style.height=DH+'px'; } const nw=Math.round(DW*d), nh=Math.round(DH*d); if(dcv.width===nw&&dcv.height===nh) return; /* unchanged: don't clear the canvas */ dcv.width=nw; dcv.height=nh; dg.setTransform(d,0,0,d,0,0); dbk.width=Math.round(DW/2); dbk.height=Math.round(DH/2); dbkT=0; }
