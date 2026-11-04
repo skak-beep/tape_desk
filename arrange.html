@@ -207,7 +207,7 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
       <div class="row" id="draw-pal"></div>
       <div class="row between" id="draw-tools" style="margin-top:4px">
         <span class="seg" id="dr-tool"><button data-t="pen" class="on">ペン</button><button data-t="erase">消す</button></span>
-        <span class="seg"><button id="dr-bg" class="on">映像</button></span>
+        <span class="seg"><button id="dr-bg" class="on">映像</button><button id="dr-grid" class="on">格子</button></span>
         <span class="seg"><button id="dr-undo">↶</button><button id="dr-clear">全消し</button></span>
       </div>
       <div class="lbl" id="draw-hint" style="text-transform:none;margin:2px 0">マスを塗る=音 ・ 高さ=音の高さ ・ 左→右=時間(横 32 マスで 1/2/4 小節) ・ 色=音源(色を選んで上の音源をタップで割り当て) ・ 映像を入れるとその上に重なる ・ 左上の Play で線が走る</div>
@@ -1077,7 +1077,7 @@ function tlPos(){ return tlPlaying?tlHeadAt+Math.max(0,ac.currentTime-tlStartAt)
 /* ---------- 描く: a pixel score over your own footage. Cells = notes. The line sweeps left→right in time with the BPM;
    x = when (16ths), y = which note of the current scale (3 octaves from C3), colour = which instrument. ---------- */
 const DRNAME=['若葉','珊瑚','藤','琥珀','藍','薔薇','空','墨'];
-const dr={on:false,timer:null,t0:0,len:0,ev:[],i:0,cells:new Map(),cur:null,tool:'pen',col:0,undo:[],lastHit:0,bg:(()=>{ try{ return localStorage.getItem('td_drbg')!=='0'; }catch(e){ return true; } })(),
+const dr={on:false,timer:null,t0:0,len:0,ev:[],i:0,cells:new Map(),cur:null,tool:'pen',col:0,undo:[],lastHit:0,bg:(()=>{ try{ return localStorage.getItem('td_drbg')!=='0'; }catch(e){ return true; } })(),grid:(()=>{ try{ return localStorage.getItem('td_drgrid')!=='0'; }catch(e){ return true; } })(),
   pal:[{c:'#8fd0a8',id:'vpiano'},{c:'#ff8a70',id:'ping'},{c:'#b7a6ff',id:'piron'},{c:'#ffc45c',id:'fuwa'},{c:'#5f7cff',id:'ep'},{c:'#ff9ac4',id:'pluck'},{c:'#9fdcff',id:'bass'},{c:'#1f1d24',id:'drums'}]};
 const DNR=28, DNC=32; const dcv=$('#dcv'), dg=dcv.getContext('2d'); let DW=0,DH=0; const dbk=document.createElement('canvas'), dbg=dbk.getContext('2d'); let dbkT=0, drLastF=0; const drr=(x,y,w,h,r)=>{ dg.beginPath(); if(dg.roundRect) dg.roundRect(x,y,Math.max(0,w),Math.max(0,h),r); else dg.rect(x,y,Math.max(0,w),Math.max(0,h)); };
 function drResize(){ const r=dcv.getBoundingClientRect(); if(!r.width) return; const d=Math.min(1.5,devicePixelRatio||1); DW=r.width; DH=Math.round(DW/DNC*DNR); dcv.style.height=DH+'px'; dcv.width=Math.round(DW*d); dcv.height=Math.round(DH*d); dg.setTransform(d,0,0,d,0,0); dbk.width=Math.round(DW/2); dbk.height=Math.round(DH/2); dbkT=0; }
@@ -1103,8 +1103,8 @@ function drBackdrop(){ let src=null, sw=0, sh=0; if(!dr.bg){ } else if(vid&&!vid
   const now=performance.now(); if(now-dbkT>100||!dbkT){ dbkT=now; const bw=dbk.width, bh=dbk.height, s=Math.max(bw/sw,bh/sh), w=sw*s, h=sh*s; try{ dbg.drawImage(src,(bw-w)/2,(bh-h)/2,w,h); dbg.fillStyle='rgba(8,8,12,0.22)'; dbg.fillRect(0,0,bw,bh); }catch(e){} } dg.drawImage(dbk,0,0,DW,DH); return true; }
 function drRender(force){ if(!DW||$('#draw-wrap').hidden) return; const nowF=performance.now(); if(!force&&nowF-drLastF<30) return; drLastF=nowF; dg.clearRect(0,0,DW,DH); const hasV=drBackdrop(); const cols=drCols(), cw=DW/cols, rh=DH/DNR, sc=SC[glScale], L=sc.length, now=performance.now();
   /* hairline grid: white at low alpha over footage, a touch stronger on bars and octave rows */
-  for(let r=0;r<=DNR;r++){ const y=Math.round(DH-r*rh)+0.5; dg.strokeStyle=r%L===0?'rgba(255,255,255,0.16)':'rgba(255,255,255,0.07)'; dg.lineWidth=1; dg.beginPath(); dg.moveTo(0,y); dg.lineTo(DW,y); dg.stroke(); }
-  const perBar=cols/seqBars; for(let c=0;c<=cols;c++){ const x=Math.round(c*cw)+0.5; dg.strokeStyle=c%perBar===0?'rgba(255,255,255,0.2)':c%4===0?'rgba(255,255,255,0.11)':'rgba(255,255,255,0.05)'; dg.beginPath(); dg.moveTo(x,0); dg.lineTo(x,DH); dg.stroke(); }
+  if(dr.grid) for(let r=0;r<=DNR;r++){ const y=Math.round(DH-r*rh)+0.5; dg.strokeStyle=r%L===0?'rgba(255,255,255,0.16)':'rgba(255,255,255,0.07)'; dg.lineWidth=1; dg.beginPath(); dg.moveTo(0,y); dg.lineTo(DW,y); dg.stroke(); }
+  const perBar=cols/seqBars; if(dr.grid) for(let c=0;c<=cols;c++){ const x=Math.round(c*cw)+0.5; dg.strokeStyle=c%perBar===0?'rgba(255,255,255,0.2)':c%4===0?'rgba(255,255,255,0.11)':'rgba(255,255,255,0.05)'; dg.beginPath(); dg.moveTo(x,0); dg.lineTo(x,DH); dg.stroke(); }
   /* cells: soft squares with a bright inner edge; a hit swells and glows for a beat */
   for(const cell of dr.cells.values()){ const x=cell.c*cw, y=DH-(cell.r+1)*rh; const a=cell.lit?Math.max(0,1-(now-cell.lit)/420):0; const col=dr.pal[cell.ci].c; const pad=Math.max(1,cw*0.09)-a*1.5; dg.fillStyle=col; dg.globalAlpha=0.82+a*0.18; drr(x+pad,y+pad,cw-pad*2,rh-pad*2,Math.min(3,cw*0.18)); dg.fill(); dg.globalAlpha=1;
     dg.strokeStyle='rgba(255,255,255,'+(0.22+a*0.5)+')'; dg.lineWidth=1; drr(x+pad+0.5,y+pad+0.5,cw-pad*2-1,rh-pad*2-1,Math.min(3,cw*0.18)); dg.stroke();
@@ -1124,6 +1124,7 @@ dcv.addEventListener('pointermove',e=>{ if(!dr.cur) return; const {c,r}=drCellAt
 const drUp=()=>{ if(ac&&ac.state!=='running'){ try{ ac.resume(); }catch(e){} if(typeof interrupted!=='undefined'&&ac.state!=='running') setTimeout(()=>{ if(ac&&ac.state!=='running') askWake('音が止まっています'); },300); } const cur=dr.cur; if(!cur) return; dr.cur=null; if(cur.changed){ dr.undo.push(cur.snap); if(dr.undo.length>60) dr.undo.shift(); drRebuild(); if(dr.on){ dr.i=dr.ev.findIndex(ev=>dr.t0+ev.t*dr.len>ac.currentTime); if(dr.i<0) dr.i=dr.ev.length; } drSave(); } drRender(true); };
 dcv.addEventListener('pointerup',drUp); dcv.addEventListener('pointercancel',drUp);
 $('#dr-bg').onclick=()=>{ dr.bg=!dr.bg; $('#dr-bg').classList.toggle('on',dr.bg); try{ localStorage.setItem('td_drbg',dr.bg?'1':'0'); }catch(e){} drRender(true); drAnim(); toast(dr.bg?'グリッドの下に映像を出します':'グリッドの下は無地にします'); }; $('#dr-bg').classList.toggle('on',dr.bg);
+$('#dr-grid').onclick=()=>{ dr.grid=!dr.grid; $('#dr-grid').classList.toggle('on',dr.grid); try{ localStorage.setItem('td_drgrid',dr.grid?'1':'0'); }catch(e){} drRender(true); toast(dr.grid?'格子線を出します':'格子線を消します(マスは残ります)'); }; $('#dr-grid').classList.toggle('on',dr.grid);
 $('#dr-undo').onclick=()=>{ const u=dr.undo.pop(); if(u===undefined) return; drRestore(u); drRebuild(); drSave(); drRender(); };
 $('#dr-clear').onclick=()=>{ if(!dr.cells.size) return; dr.undo.push(drSnap()); dr.cells=new Map(); drRebuild(); drSave(); drRender(); toast('全部消しました(↶ で戻せます)'); };
 document.querySelectorAll('#dr-tool button').forEach(b=>b.onclick=()=>{ dr.tool=b.dataset.t; document.querySelectorAll('#dr-tool button').forEach(x=>x.classList.toggle('on',x===b)); drPalRender(); });
