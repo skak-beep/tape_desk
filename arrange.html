@@ -15,7 +15,7 @@ body{margin:0;background:radial-gradient(1200px 600px at 50% -200px,#181830 0%,v
 .top .r{margin-left:auto;color:var(--dim);font-size:11px;white-space:nowrap;font-family:var(--mono)} .top .r b{color:var(--fg);font-weight:500} .top .r b.rec{color:var(--rec)}
 #stack{width:100%;height:70px;display:block;border:1px solid var(--line);border-radius:8px;background:var(--bg-2)}
 button:disabled{opacity:0.35}
-.recbar{display:flex;align-items:center;gap:6px;padding:4px 0} .recbar .rl,#grain-src .rl{display:flex;gap:3px} .rl[hidden]{display:none!important} #grain-src .rl button{min-height:36px;padding:8px 9px;font-size:11px} .recbar .rl button{min-height:36px;padding:8px 9px;font-size:11px} .recbar #b-rec-top{min-height:40px;padding:8px 14px} .recbar #m-tl{min-height:36px;padding:8px 9px;font-size:11px} .recbar .lbl{margin-left:auto;font-size:11px;color:var(--fg);white-space:nowrap;text-align:right} .recbar .lbl.rec{color:var(--rec)} .recbar .lbl.cnt{color:var(--acc);font-size:16px;font-weight:600}
+.recbar{display:flex;align-items:center;gap:6px;padding:4px 0} .recbar .rl,#grain-src .rl{display:flex;gap:3px} .rl[hidden]{display:none!important} .c.on.maybe{opacity:.55} #grain-src .rl button{min-height:36px;padding:8px 9px;font-size:11px} .recbar .rl button{min-height:36px;padding:8px 9px;font-size:11px} .recbar #b-rec-top{min-height:40px;padding:8px 14px} .recbar #m-tl{min-height:36px;padding:8px 9px;font-size:11px} .recbar .lbl{margin-left:auto;font-size:11px;color:var(--fg);white-space:nowrap;text-align:right} .recbar .lbl.rec{color:var(--rec)} .recbar .lbl.cnt{color:var(--acc);font-size:16px;font-weight:600}
 #glide.rec{border-color:var(--rec);box-shadow:0 0 0 1px var(--rec) inset}
 .pane{display:flex;flex-direction:column;gap:10px} .pane[hidden]{display:none!important}
 .transport{position:sticky;top:0;z-index:6;background:var(--bg);padding:6px 0 0;border-bottom:1px solid var(--line)} .trow{display:flex;gap:6px;align-items:center} #tp-bar{position:relative;height:7px;margin-top:6px;background:var(--bg)} #tp-bar>div{position:absolute;top:0;height:7px} #tp-wa{background:var(--bg-3);left:0;width:100%;border-radius:4px} #tp-fill{background:linear-gradient(90deg,var(--c-key),var(--c-pad));opacity:.6;left:0;width:0;border-radius:4px} #tp-head{width:2px;background:var(--fg);left:0}
@@ -227,6 +227,10 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
       <div class="grp" id="run-grp"><button id="b-run" class="primary">▶ Run</button></div>
       <div class="grp"><span class="cap">消す</span><button id="b-clrpat">この行</button><button id="b-clrset">この音源</button><button id="b-clrall">全部</button></div>
       <span id="sel-name" class="lbl" style="display:none"></span>
+    </div>
+    <div class="row between" id="phr-row">
+      <div class="grp"><span class="cap">自動</span><button id="b-phr" class="primary">✦ 新フレーズ</button><span class="seg" id="phr-style"><button data-ps="normal" class="on">ふつう</button><button data-ps="sparse">まばら</button><button data-ps="groove">グルーヴ</button><button data-ps="glitch">グリッチ</button><button data-ps="drift">ずらす</button></span></div>
+      <span class="lbl" style="text-transform:none">この音源の行に撒き直す ・ 確率付きなのでループごとに少し変わる</span>
     </div>
     <div id="editor" class="editor" hidden>
       <div class="hd"><span id="ed-name">—</span><span><button id="ed-rev">逆再生</button><button id="ed-clean">Tape</button><button id="ed-reset">Reset</button><button id="ed-close">Close</button></span></div>
@@ -699,7 +703,7 @@ const gridEl=$('#grid'), padsEl=$('#pads'); const heldCells=new Set();
 const dbl=(el,fn)=>{ let t=0; el.addEventListener('pointerdown',e=>{ const n=performance.now(); if(n-t<380){ t=0; fn(e); } else t=n; }); };
 const MULTS=[0.25,0.5,1,2,4], multLabel=m=>m===0.25?'¼':m===0.5?'½':'×'+m;
 function build(){ document.body.dataset.mode=mode; if(typeof syncPlayBtn==='function') setTimeout(syncPlayBtn,0); document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('on',b.dataset.mode===mode)); INSTR.forEach(it=>{ if(it.kind==='p') SETS[it.id].pads.forEach((p,i)=>p.l=KEYS[(key+PENTA[i])%12]); });
-  const isGlide=mode==='glide', isDraw=mode==='draw', isStep=mode==='step'; $('#glide').hidden=!isGlide; $('#glide-wrap').hidden=!isGlide; $('#glide-row').hidden=!isGlide; $('#draw-wrap').hidden=!isDraw; gridEl.hidden=!isStep; $('#step-row').hidden=!isStep; $('#step-hint').hidden=!isStep; padsEl.hidden=!isStep; if(!isStep){ $('#editor').hidden=true; } if(isGlide) requestAnimationFrame(glResize); if(isDraw&&typeof drResize==='function'){ requestAnimationFrame(()=>{ drResize(); drRender(); }); drPalRender(); } if(isStep&&editMode) openEditor(selPad()); renderInstr();
+  const isGlide=mode==='glide', isDraw=mode==='draw', isStep=mode==='step'; $('#glide').hidden=!isGlide; $('#glide-wrap').hidden=!isGlide; $('#glide-row').hidden=!isGlide; $('#draw-wrap').hidden=!isDraw; gridEl.hidden=!isStep; $('#step-row').hidden=!isStep; $('#phr-row').hidden=!isStep; $('#step-hint').hidden=!isStep; padsEl.hidden=!isStep; if(!isStep){ $('#editor').hidden=true; } if(isGlide) requestAnimationFrame(glResize); if(isDraw&&typeof drResize==='function'){ requestAnimationFrame(()=>{ drResize(); drRender(); }); drPalRender(); } if(isStep&&editMode) openEditor(selPad()); renderInstr();
   gridEl.innerHTML=''; padsEl.innerHTML='';
   SETS[curSet].pads.forEach((p,i)=>{
     const rw=document.createElement('div'); rw.className='rw'; rw.innerHTML=`<div class="ms"><button class="m ${p.mute?'off':''}">◉</button><button class="s ${p.solo?'on':''}">S</button></div><div class="nm">${p.l}</div><div class="rt">${multLabel(p.mult)}</div><div class="cells">${Array.from({length:16},(_,k)=>`<div class="c ${k%4===0?'b4':''}" data-k="${k}"></div>`).join('')}</div>`;
@@ -708,7 +712,7 @@ function build(){ document.body.dataset.mode=mode; if(typeof syncPlayBtn==='func
     rw.querySelector('.rt').onclick=()=>{ p.mult=MULTS[(MULTS.indexOf(p.mult)+1)%MULTS.length]; const rt=rw.querySelector('.rt'); rt.textContent=multLabel(p.mult); rt.classList.toggle('x',p.mult!==1); p.step=0; p.next=0; };
     rw.querySelector('.rt').classList.toggle('x',p.mult!==1);
     rw.querySelector('.ms .m').onclick=e=>{ p.mute=!p.mute; e.target.classList.toggle('off',p.mute); renderGrid(); }; rw.querySelector('.ms .s').onclick=e=>{ p.solo=!p.solo; e.target.classList.toggle('on',p.solo); renderGrid(); };
-    rw.querySelectorAll('.c').forEach(c=>{ const k=+c.dataset.k; c.addEventListener('pointerdown',e=>{ ensureAudio(); c.setPointerCapture(e.pointerId); selected={set:curSet,idx:i}; heldCells.add(i+':'+k); if(latch) p.pat[k]^=1; if(!seq.on) trig(p,p.p.vel,0,ac.currentTime); updateSel(); });
+    rw.querySelectorAll('.c').forEach(c=>{ const k=+c.dataset.k; c.addEventListener('pointerdown',e=>{ ensureAudio(); c.setPointerCapture(e.pointerId); selected={set:curSet,idx:i}; heldCells.add(i+':'+k); if(latch){ p.pat[k]^=1; if(p.ch) p.ch[k]=1; } if(!seq.on) trig(p,p.p.vel,0,ac.currentTime); updateSel(); });
       const up=()=>{ heldCells.delete(i+':'+k); renderGrid(); }; c.addEventListener('pointerup',up); c.addEventListener('pointercancel',up); });
     gridEl.appendChild(rw);
     const pad=document.createElement('div'); pad.className='pad'; pad.textContent=p.l; dbl(pad,()=>{ selected={set:curSet,idx:i}; openEditor(p); updateSel(); }); pad.addEventListener('pointerdown',e=>{ ensureAudio(); pad.setPointerCapture(e.pointerId); selected={set:curSet,idx:i}; const r=pad.getBoundingClientRect(); const v=Math.min(1,Math.max(0.4,1-(e.clientY-r.top)/r.height)); const stop=p.f(v,(i%4-1.5)/1.5*0.7,p.p); pad.classList.add('lit'); heldNames.set(e.pointerId,{stop,nm:pad}); if(editMode) openEditor(p); updateSel(); });
@@ -717,7 +721,7 @@ function build(){ document.body.dataset.mode=mode; if(typeof syncPlayBtn==='func
 const heldNames=new Map();
 function updateSel(){ const p=selPad(); $('#sel-name').textContent=SETS[selected.set].name+' · '+p.l; if(!$('#editor').hidden) openEditor(p); renderGrid(); padsEl.querySelectorAll('.pad').forEach((el,i)=>el.classList.toggle('sel',selected.set===curSet&&i===selected.idx)); }
 const anySolo=()=>Object.values(SETS).some(st=>st.pads.some(p=>p.solo)); const anySetSolo=()=>Object.values(SETS).some(st=>st.solo); const setOn=st=>!st.mute&&(!anySetSolo()||st.solo); const padOn=(p,st)=>(!st||setOn(st))&&!p.mute&&(!anySolo()||p.solo);
-function renderGrid(){ renderSeqTabs(); const solo=anySolo(); gridEl.querySelectorAll('.rw').forEach((rw,i)=>{ const p=SETS[curSet].pads[i]; rw.classList.toggle('sel',selected.set===curSet&&i===selected.idx); rw.classList.toggle('dim',p.mute||(solo&&!p.solo)); rw.querySelectorAll('.c').forEach((c,k)=>{ c.classList.toggle('on',!!p.pat[k]); c.classList.toggle('cur',seq.on&&p.step===k); c.classList.toggle('held',heldCells.has(i+':'+k)); }); }); }
+function renderGrid(){ renderSeqTabs(); const solo=anySolo(); gridEl.querySelectorAll('.rw').forEach((rw,i)=>{ const p=SETS[curSet].pads[i]; rw.classList.toggle('sel',selected.set===curSet&&i===selected.idx); rw.classList.toggle('dim',p.mute||(solo&&!p.solo)); rw.querySelectorAll('.c').forEach((c,k)=>{ c.classList.toggle('on',!!p.pat[k]); c.classList.toggle('maybe',!!p.pat[k]&&!!p.ch&&p.ch[k]<1); c.classList.toggle('cur',seq.on&&p.step===k); c.classList.toggle('held',heldCells.has(i+':'+k)); }); }); }
 // the strip above the grid lists only the instruments that have steps, so you can see at a glance what the sequence is made of and jump between them; tap = select, double tap = adjust that instrument's sound
 const seqTabsEl=$('#seq-tabs');
 function renderSeqTabs(){ if(mode!=='step'){ seqTabsEl.hidden=true; return; } seqTabsEl.hidden=false; const used=INSTR.filter(it=>SETS[it.id]&&SETS[it.id].pads.some(p=>p.pat.some(Boolean))); const key2=used.map(it=>it.id+':'+(it.id===curSet)+':'+SETS[it.id].pads.reduce((a,p)=>a+p.pat.filter(Boolean).length,0)+':'+SETS[it.id].pads.every(p=>p.mute)+':'+(SETS[it.id].mute?1:0)+(SETS[it.id].solo?1:0)).join('|')+(anySetSolo()?'S':''); if(seqTabsEl.dataset.k===key2) return; seqTabsEl.dataset.k=key2; seqTabsEl.innerHTML='';
@@ -735,14 +739,35 @@ $('#ed-rev').onclick=()=>{ const p=selPad(); p.p.reverse=!p.p.reverse; $('#ed-re
 $('#ed-close').onclick=()=>{ $('#editor').hidden=true; }; $('#ed-reset').onclick=()=>{ const p=selPad(); const keep={clean:p.p.clean,voice:p.p.voice}; p.p=Object.assign(PP(),keep); openEditor(p); };
 
 $('#b-clrpat').onclick=()=>{ const p=selPad(); p.pat.fill(0); renderGrid(); toast(p.l+' の行を消しました'); };
-$('#b-clrset').onclick=()=>{ const st=SETS[curSet]; if(!st) return; st.pads.forEach(p=>{ p.pat.fill(0); }); renderGrid(); const nm=(INSTR.find(x=>x.id===curSet)||{}).name||curSet; toast(nm+' のステップを全部消しました'); };
+/* ✦ 新フレーズ — phrz 風: 今の音源の行に、パターン(ばらまく/均等/固める)・密度・確率で音を撒き直す。
+   粒やドラムは全行が候補、音程のある音源は少ない行に絞って根音/5度を拍頭に置く。確率 p.ch[k] は再生時に引かれるのでループごとに揺れる。 */
+let phrStyle='normal';
+document.querySelectorAll('#phr-style button').forEach(b=>b.onclick=()=>{ phrStyle=b.dataset.ps; document.querySelectorAll('#phr-style button').forEach(x=>x.classList.toggle('on',x===b)); });
+function newPhrase(set,it){ const R=Math.random, pick=a=>a[Math.floor(R()*a.length)]; const pads=set.pads, n=pads.length, pitched=it&&it.kind==='p'; const S=phrStyle;
+  const dens=S==='sparse'?0.12:S==='glitch'?0.5:S==='groove'?0.3:0.26, rows=pitched?Math.min(n,S==='sparse'?2:3+Math.floor(R()*2)):Math.max(1,Math.min(n,S==='sparse'?Math.floor(n*0.4):S==='groove'?4+Math.floor(R()*2):S==='glitch'?Math.ceil(n*0.6):Math.ceil(n*(0.5+R()*0.3))));
+  const use=new Set(); if(pitched){ use.add(0); if(R()<0.8) use.add(4%n); while(use.size<rows) use.add(Math.floor(R()*n)); } else { while(use.size<rows) use.add(Math.floor(R()*n)); }
+  pads.forEach((p,i)=>{ p.pat.fill(0); p.ch=null; p.mult=1; if(!use.has(i)) return; const pat=new Uint8Array(16), ch=new Float32Array(16).fill(1);
+    const kind=S==='groove'?pick(['even','even','bunched']):S==='glitch'?pick(['bunched','scatter']):S==='drift'?'scatter':pick(['scatter','even','bunched']);
+    const d=Math.min(1,dens*(0.5+R()))*(pitched&&i!==0?0.8:1);
+    if(kind==='even'){ const step=pick([2,4,4,8]), off=R()<0.6?0:Math.floor(R()*step); for(let k=off;k<16;k+=step) if(R()<0.6+d) pat[k]=1; }
+    else if(kind==='bunched'){ const starts=1+Math.floor(R()*2); for(let b=0;b<starts;b++){ const s0=Math.floor(R()*16), len=2+Math.floor(R()*(S==='glitch'?6:3)); for(let k=s0;k<Math.min(16,s0+len);k++) pat[k]=1; } }
+    else { for(let k=0;k<16;k++) if(R()<d*(k%4===0?1.6:k%2===0?1:0.6)) pat[k]=1; }
+    if(S==='groove'&&!pitched&&i===0){ pat[0]=1; pat[8]=R()<0.7?1:0; pat[10]=R()<0.4?1:0; }
+    if(S==='glitch'&&R()<0.5) p.mult=2;
+    for(let k=0;k<16;k++) if(pat[k]) ch[k]=S==='drift'?0.45+R()*0.4:S==='glitch'?0.6+R()*0.4:k%4===0?1:0.75+R()*0.25;
+    if(S==='drift'){ /* bars alternate: half the hits only every other loop */ }
+    p.pat.set(pat); p.ch=ch; });
+  if(!pads.some(p=>p.pat.some(x=>x))){ const p=pads[0]; p.pat[0]=1; p.pat[8]=1; }
+}
+$('#b-phr').onclick=()=>{ ensureAudio(); const st=SETS[curSet]; if(!st) return; const it=INSTR.find(x=>x.id===curSet); if(curSet==='grain'&&!sample){ toast('先に「粒の素材」で録音かファイルを入れてください'); return; } newPhrase(st,it); renderGrid(); renderSeqTabs&&renderSeqTabs(); if(!seq.on) runSeq(true); toast((it?it.name:curSet)+' に新しいフレーズを撒きました(気に入ったら上の REC)'); };
+$('#b-clrset').onclick=()=>{ const st=SETS[curSet]; if(!st) return; st.pads.forEach(p=>{ p.pat.fill(0); p.ch=null; }); renderGrid(); const nm=(INSTR.find(x=>x.id===curSet)||{}).name||curSet; toast(nm+' のステップを全部消しました'); };
 $('#b-clrall').onclick=()=>{ for(const st of Object.values(SETS)){ st.mute=false; st.solo=false; st.pads.forEach(p=>{ p.pat.fill(0); p.mute=false; p.solo=false; }); } if(seq.on) runSeq(false); renderGrid(); toast('全セットのステップを消しました'); };
 
 /* ---------- sequencer: every row runs at its own speed ---------- */
 const seq={on:false,timer:null};
 function trig(p,v,pn,t){ const stop=p.f(v,pn,p.p,t); const wait=Math.max(0,(t-ac.currentTime)*1000); if(stop) setTimeout(stop,wait+60/P.rate*1000*0.9/p.mult); }
 function seqTick(){ const ahead=0.1, now=ac.currentTime, sw=+$('#k-swing').value*0.5; for(const set of Object.values(SETS)) set.pads.forEach((p,i)=>{ if(p.next===undefined||p.next<now-1){ p.next=now+0.02; p.step=0; }
-    const d=60/P.rate/4/p.mult; while(p.next<now+ahead){ const k=p.step; const heldHere=set===SETS[curSet]&&heldCells.has(i+':'+k); if((p.pat[k]&&padOn(p,set))||heldHere) trig(p,p.p.vel,(i%4-1.5)/1.5*0.5,p.next); p.next+=(k%2===0)?d*(1+sw):d*(1-sw); p.step=(k+1)%16; } }); renderGrid(); }
+    const d=60/P.rate/4/p.mult; while(p.next<now+ahead){ const k=p.step; const heldHere=set===SETS[curSet]&&heldCells.has(i+':'+k); if(((p.pat[k]&&padOn(p,set)&&(!p.ch||p.ch[k]>=1||Math.random()<p.ch[k]))||heldHere)) trig(p,p.p.vel,(i%4-1.5)/1.5*0.5,p.next); p.next+=(k%2===0)?d*(1+sw):d*(1-sw); p.step=(k+1)%16; } }); renderGrid(); }
 function runSeq(on,startAt){ ensureAudio(); seq.on=on; $('#b-run').textContent=on?'■ 停止':'▶ Run'; $('#b-run').classList.toggle('on',on); if(typeof syncPlayBtn==='function') syncPlayBtn(); clearInterval(seq.timer);
   if(on){ const t0=startAt||(playing?loopStart:ac.currentTime+0.05); for(const set of Object.values(SETS)) set.pads.forEach(p=>{ const d=60/P.rate/4/p.mult; const n=Math.max(0,Math.ceil((ac.currentTime+0.02-t0)/d)); p.next=t0+n*d; p.step=n%16; }); seq.timer=setInterval(seqTick,25); } renderGrid(); }
 $('#b-run').onclick=()=>runSeq(!seq.on);
