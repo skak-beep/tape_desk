@@ -210,7 +210,7 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
         <span class="seg" id="dr-tool"><button data-t="pen" class="on">ペン</button><button data-t="erase">消す</button></span>
         <span class="seg"><button id="dr-bg" class="on">映像</button><button id="dr-grid" class="on">格子</button></span>
       </div>
-      <div class="row" style="margin-top:4px"><label class="kn"><span id="dr-vol-l">この色の音量</span><input id="dr-vol" type="range" min="0" max="1.5" step="0.01" value="1"></label>
+      <div class="row" style="margin-top:4px"><label class="kn"><span id="dr-vol-l">この色の音量</span><input id="dr-vol" type="range" min="0" max="1.5" step="0.01" value="1"></label><label class="kn"><span id="dr-ofs-l">赤の遅れ 0ms</span><input id="dr-ofs" type="range" min="-300" max="600" step="10" value="0"></label>
         <span class="seg"><button id="dr-undo">↶</button><button id="dr-clear">全消し</button></span>
       </div>
       <div class="lbl" id="draw-hint" style="text-transform:none;margin:2px 0">マスを塗る=音 ・ 高さ=音の高さ ・ 左→右=時間(横 32 マスで 1/2/4 小節) ・ 色=音源(色を選んで上の音源をタップで割り当て) ・ 映像パネルを開くと上の映像がそのまま譜面になる ・ 左上の Play で線が走る</div>
@@ -1094,7 +1094,8 @@ function drResize(){ const d=Math.min(1.5,devicePixelRatio||1); if(drOver()){ if
 /* in 描く the stage is the video panel itself: the grid canvas moves inside it, between the HUD bands, and the overlay graphics keep running underneath. Standalone (dark) when the panel is closed. */
 function drMount(){ const over=mode==='draw'&&!vidSec.hidden; const vw=$('#vwrap'); vw.classList.toggle('draw',over); if(over){ if(dcv.parentElement!==vw) vw.appendChild(dcv); dcv.style.height=''; } else { const home=$('#draw-wrap'); if(dcv.parentElement!==home) home.insertBefore(dcv,$('#draw-pal')); } requestAnimationFrame(()=>{ vResize(); drResize(); drRender(true); }); }
 const drLoopLen=()=>seqBars*4*60/P.rate; const drCols=()=>DNC;
-const drLat=()=>{ if(!ac) return 0; let l=(ac.outputLatency||0)+(ac.baseLatency||0); if(l<0.02) l=/iPhone|iPad/.test(navigator.userAgent)?0.12:0.04; return l; };
+let drOfs=(()=>{ try{ const v=parseFloat(localStorage.getItem('td_drofs')); return isFinite(v)?v:0; }catch(e){ return 0; } })();
+const drLat=()=>{ if(!ac) return 0; let l=(ac.outputLatency||0)+(ac.baseLatency||0); if(l<0.02) l=/iPhone|iPad/.test(navigator.userAgent)?0.12:0.04; return l+drOfs; };
 const drVisT=()=>ac.currentTime-drLat();
 function drSemi(row){ const sc=SC[glScale], L=sc.length; return 12*Math.floor(row/L)+sc[row%L]-12-(L<=5?12:0); } /* 28 rows: pentatonic spans 5½ octaves so it starts an octave lower to keep the middle rows mid-range */
 /* lv: level share for this hit. Cells stacked in one column play together, so each gets 1/√n of the room (a 4-note stack is ~6 dB per note quieter) and the whole drawing sits at 0.75 — chords stop hitting the limiter. */
@@ -1132,6 +1133,7 @@ function drRender(force){ if(!DW||$('#draw-wrap').hidden) return; if(drOver()){ 
   /* tiny readout, top-left: bar.beat */
   if(dr.on&&ac){ const ph=(((drVisT()-dr.t0)/dr.len)%1+1)%1, step=Math.floor(ph*cols); dg.fillStyle='rgba(255,255,255,0.7)'; dg.font='9px '+css('--mono'); dg.textAlign='left'; const pb=cols/seqBars; dg.fillText((Math.floor(step/pb)+1)+'.'+(Math.floor((step%pb)/(pb/4))+1)+'  '+P.rate+' BPM  '+seqBars+'小節',8,12); } }
 function drPalRender(){ const el=$('#draw-pal'); el.innerHTML=''; dr.pal.forEach((p,i)=>{ const b=document.createElement('button'); b.style.setProperty('--pc',p.c); const it=INSTR.find(x=>x.id===p.id); b.innerHTML='<small>'+(it?it.name:'')+'</small>'; b.style.opacity=p.g===0?0.3:1; b.classList.toggle('on',i===dr.col&&dr.tool==='pen'); b.onclick=()=>{ dr.col=i; dr.tool='pen'; document.querySelectorAll('#dr-tool button').forEach(x=>x.classList.toggle('on',x.dataset.t==='pen')); const it2=INSTR.find(x=>x.id===p.id); if(it2){ instr=it2; renderInstr(); } drPalRender(); }; el.appendChild(b); }); const cur=dr.pal[dr.col]; const sl=$('#dr-vol'); if(sl){ sl.value=cur.g===undefined?1:cur.g; sl.style.setProperty('--pc',cur.c); } const l=$('#dr-vol-l'); if(l){ const it=INSTR.find(x=>x.id===cur.id); l.textContent=DRNAME[dr.col]+(it?'('+it.name+')':'')+' の音量'; } }
+$('#dr-ofs').value=Math.round(drOfs*1000); const drOfsL=()=>{ $('#dr-ofs-l').textContent='赤の遅れ '+(drOfs>=0?'+':'')+Math.round(drOfs*1000)+'ms'+(ac&&ac.outputLatency?' (端末 '+Math.round((ac.outputLatency+(ac.baseLatency||0))*1000)+'ms)':''); }; drOfsL(); $('#dr-ofs').oninput=e=>{ drOfs=(+e.target.value)/1000; try{ localStorage.setItem('td_drofs',String(drOfs)); }catch(x){} drOfsL(); };
 $('#dr-vol').oninput=e=>{ dr.pal[dr.col].g=+e.target.value; drSave(); const b=$('#draw-pal').children[dr.col]; if(b) b.style.opacity=dr.pal[dr.col].g===0?0.3:1; };
 function drSave(){ try{ localStorage.setItem('td_draw',JSON.stringify({v:2,pal:dr.pal.map(p=>p.id),gain:dr.pal.map(p=>p.g===undefined?1:p.g),cells:[...dr.cells.values()].map(c=>[c.c,c.r,c.ci])})); }catch(e){} }
 (function drLoad(){ try{ const o=JSON.parse(localStorage.getItem('td_draw')||'null'); if(!o||o.v!==2) return; if(o.pal) o.pal.forEach((id,i)=>{ if(dr.pal[i]&&INSTR.some(x=>x.id===id)) dr.pal[i].id=id; }); if(o.gain) o.gain.forEach((g,i)=>{ if(dr.pal[i]&&isFinite(g)) dr.pal[i].g=g; }); (o.cells||[]).forEach(([c,r,ci])=>dr.cells.set(drKey(c,r),{c,r,ci})); }catch(e){} })();
