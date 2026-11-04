@@ -1120,7 +1120,7 @@ function drRender(force){ if(!DW||$('#draw-wrap').hidden) return; if(drOver()){ 
   /* cells: soft squares with a bright inner edge; a hit swells and glows for a beat */
   /* cells: a hairline outline in the colour at full opacity; the fill is translucent and 'screen'-blended so the footage shows through. A hit fills in and swells for a beat. */
   for(const cell of dr.cells.values()){ const x=cell.c*cw, y=DH-(cell.r+1)*rh; const a=cell.lit?Math.max(0,1-(now-cell.lit)/420):0; const col=dr.pal[cell.ci].c; const pad=Math.max(1,cw*0.1)-a*1.5, rad=Math.min(2.5,cw*0.16);
-    dg.save(); dg.globalCompositeOperation=hasV?'screen':'source-over'; dg.fillStyle=col; dg.globalAlpha=(hasV?0.42:0.55)+a*0.5; drr(x+pad,y+pad,cw-pad*2,rh-pad*2,rad); dg.fill(); dg.restore();
+    dg.save(); dg.fillStyle=col; dg.globalAlpha=1; drr(x+pad,y+pad,cw-pad*2,rh-pad*2,rad); dg.fill(); dg.restore();
     dg.strokeStyle='#fff'; dg.globalAlpha=1; dg.lineWidth=0.45; drr(x+pad+0.25,y+pad+0.25,cw-pad*2-0.5,rh-pad*2-0.5,rad); dg.stroke();
     if(a>0){ dg.save(); dg.globalCompositeOperation='screen'; dg.fillStyle=col; dg.globalAlpha=a*0.25; drr(x-cw*0.35*a,y-rh*0.35*a,cw*(1+0.7*a),rh*(1+0.7*a),4); dg.fill(); dg.globalAlpha=a*0.14; drr(x-cw*0.8*a,y-rh*0.8*a,cw*(1+1.6*a),rh*(1+1.6*a),6); dg.fill(); dg.restore(); } }
   if(dr.on&&ac){ const ph=(((ac.currentTime-dr.t0)/dr.len)%1+1)%1; const x=ph*DW; dg.strokeStyle='rgba(255,255,255,0.25)'; dg.lineWidth=4; dg.beginPath(); dg.moveTo(x,0); dg.lineTo(x,DH); dg.stroke(); dg.strokeStyle='rgba(255,255,255,0.95)'; dg.lineWidth=1.2; dg.beginPath(); dg.moveTo(x,0); dg.lineTo(x,DH); dg.stroke(); }
