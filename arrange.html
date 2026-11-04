@@ -482,7 +482,7 @@ function touchVel(e){ tvGain=1; if(tvMode==='off'||!e) return 0.75;
   let p=e.pressure; if(e.pointerType==='touch'&&!(p>0&&p<1&&Math.abs(p-0.5)>0.01)&&performance.now()-tvLast.t<80&&tvLast.f>0&&tvLast.f<1) p=tvLast.f; if(e.pointerType==='touch'&&p>0&&p<1&&Math.abs(p-0.5)>0.01){ const v=tvMap(p*1.6); tvShow(p*100,v); return v; } let a=(e.width||0)*(e.height||0); if(!(a>1)&&e.pointerType==='touch'&&performance.now()-tvLast.t<80) a=tvLast.a; if(!(a>1)){ tvShow(0,0.75); return 0.75; } if(tv.n===0){ tv.min=a*0.8; tv.max=a*1.25; } tv.n++; if(a<tv.min) tv.min=a; else tv.min+=(a-tv.min)*0.02; if(a>tv.max) tv.max=a; else tv.max+=(a-tv.max)*0.02; const span=tv.max-tv.min; if(span<tv.min*0.25) return 0.75; const v=tvMap((a-tv.min)/span); tvShow(a,v); return v; }
 let ac=null, M=null, proc=null, noiseB=null, capNode=null, capSink=null, sinkId='', interrupted=false, fxTL=true, lowCut=true;
 function ensureAudio(){ if(ac){ if(ac.state!=='running') ac.resume(); return ac; }
-  ac=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'playback'}); noiseB=mkNoise(1);
+  ac=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'}); /* 'playback' gave iOS a ~0.3 s output buffer: every tap and the red cells were late by that much */ noiseB=mkNoise(1);
   const padSum=ac.createGain(), stIn=ac.createGain(), stD=ac.createDelay(1), stFb=ac.createGain(); stD.delayTime.value=0.0625; stFb.gain.value=0; const cleanSum=ac.createGain(), clp=ac.createBiquadFilter(); clp.type='lowpass'; clp.Q.value=0.5;
   const lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.Q.value=0.7; const sat=ac.createWaveShaper(); sat.oversample='2x'; const wow=ac.createDelay(0.1); wow.delayTime.value=0.02; const lfo=ac.createOscillator(); lfo.frequency.value=0.45; const lfoG=ac.createGain(); lfoG.gain.value=0.0008; lfo.connect(lfoG).connect(wow.delayTime); lfo.start();
   const rev=ac.createConvolver(); rev.buffer=mkIR(3.2); const revIn=ac.createGain(), revG=ac.createGain(); const pre=ac.createGain();
@@ -1095,7 +1095,7 @@ function drResize(){ const d=Math.min(1.5,devicePixelRatio||1); if(drOver()){ if
 function drMount(){ const over=mode==='draw'&&!vidSec.hidden; const vw=$('#vwrap'); vw.classList.toggle('draw',over); if(over){ if(dcv.parentElement!==vw) vw.appendChild(dcv); dcv.style.height=''; } else { const home=$('#draw-wrap'); if(dcv.parentElement!==home) home.insertBefore(dcv,$('#draw-pal')); } requestAnimationFrame(()=>{ vResize(); drResize(); drRender(true); }); }
 const drLoopLen=()=>seqBars*4*60/P.rate; const drCols=()=>DNC;
 let drOfs=(()=>{ try{ const v=parseFloat(localStorage.getItem('td_drofs')); return isFinite(v)?v:0; }catch(e){ return 0; } })();
-const drLat=()=>{ if(!ac) return 0; let l=(ac.outputLatency||0)+(ac.baseLatency||0); if(l<0.02) l=/iPhone|iPad/.test(navigator.userAgent)?0.12:0.04; return l+drOfs; };
+const drLat=()=>{ if(!ac) return 0; let l=(ac.outputLatency||0)+(ac.baseLatency||0); if(l<0.02) l=/iPhone|iPad/.test(navigator.userAgent)?0.06:0.03; return l+drOfs; };
 const drVisT=()=>ac.currentTime-drLat();
 function drSemi(row){ const sc=SC[glScale], L=sc.length; return 12*Math.floor(row/L)+sc[row%L]-12-(L<=5?12:0); } /* 28 rows: pentatonic spans 5½ octaves so it starts an octave lower to keep the middle rows mid-range */
 /* lv: level share for this hit. Cells stacked in one column play together, so each gets 1/√n of the room (a 4-note stack is ~6 dB per note quieter) and the whole drawing sits at 0.75 — chords stop hitting the limiter. */
