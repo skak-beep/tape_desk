@@ -745,7 +745,7 @@ let phrStyle='normal';
 document.querySelectorAll('#phr-style button').forEach(b=>b.onclick=()=>{ phrStyle=b.dataset.ps; document.querySelectorAll('#phr-style button').forEach(x=>x.classList.toggle('on',x===b)); });
 function newPhrase(set,it){ const R=Math.random, pick=a=>a[Math.floor(R()*a.length)]; const pads=set.pads, n=pads.length, pitched=it&&it.kind==='p'; const S=phrStyle;
   const dens=S==='sparse'?0.12:S==='glitch'?0.5:S==='groove'?0.3:0.26, rows=pitched?Math.min(n,S==='sparse'?2:3+Math.floor(R()*2)):Math.max(1,Math.min(n,S==='sparse'?Math.floor(n*0.4):S==='groove'?4+Math.floor(R()*2):S==='glitch'?Math.ceil(n*0.6):Math.ceil(n*(0.5+R()*0.3))));
-  const use=new Set(); if(pitched){ use.add(0); if(R()<0.8) use.add(4%n); while(use.size<rows) use.add(Math.floor(R()*n)); } else { while(use.size<rows) use.add(Math.floor(R()*n)); }
+  const use=new Set(); if(pitched){ /* rows are PENTA degrees: 0=root 1=m3 2=4th 3=5th 4=m7 5=oct… */ if(R()<0.75) use.add(0); if(R()<0.6) use.add(3%n); while(use.size<rows) use.add(Math.floor(R()*n)); } else { while(use.size<rows) use.add(Math.floor(R()*n)); }
   pads.forEach((p,i)=>{ p.pat.fill(0); p.ch=null; p.mult=1; if(!use.has(i)) return; const pat=new Uint8Array(16), ch=new Float32Array(16).fill(1);
     const kind=S==='groove'?pick(['even','even','bunched']):S==='glitch'?pick(['bunched','scatter']):S==='drift'?'scatter':pick(['scatter','even','bunched']);
     const d=Math.min(1,dens*(0.5+R()))*(pitched&&i!==0?0.8:1);
