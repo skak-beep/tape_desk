@@ -230,7 +230,7 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
       </div>
     </div>
     <div class="pads" id="pads"></div>
-    <div class="row between" style="margin-top:4px"><span class="cap">全体の音</span><button id="b-lowcut" class="on" style="min-height:32px;padding:6px 10px;font-size:10px">低音カット(内蔵スピーカー向け)</button></div>
+    <div class="row between" style="margin-top:4px"><span class="cap">全体の音</span><span style="display:flex;gap:6px"><button id="b-tv" class="on" style="min-height:32px;padding:6px 10px;font-size:10px">強弱: 押す面積</button><button id="b-lowcut" class="on" style="min-height:32px;padding:6px 10px;font-size:10px">低音カット</button></span></div>
     <div class="knobs">
       <div class="knob" data-k="dark" data-min="0" data-max="100" data-v="50"><div class="k">50</div>Dark</div>
       <div class="knob acc" data-k="rev" data-min="0" data-max="100" data-v="60"><div class="k">60</div>Reverb</div>
@@ -445,6 +445,7 @@ let loopLen=30, loopStart=0, playing=false, layers=[], sample=null, sampleRev=nu
 const PP=()=>({pitch:0,tone:0.5,decay:1,cut:1,level:1,pan:0,rev:1,vel:0.7,reverse:false,clean:false,voice:'bell',glide:false});
 
 /* ---------- audio ---------- */
+let tvOn=(()=>{ try{ return localStorage.getItem('td_tv')!=='0'; }catch(x){ return true; } })(); const tv={min:0,max:0,n:0}; function touchVel(e){ if(!tvOn||!e) return 0.75; let p=e.pressure; if(e.pointerType==='touch'&&p>0&&p<1&&Math.abs(p-0.5)>0.01){ return 0.3+0.7*Math.min(1,p*1.6); } const a=(e.width||0)*(e.height||0); if(!(a>1)) return 0.75; if(tv.n===0){ tv.min=a*0.8; tv.max=a*1.25; } tv.n++; if(a<tv.min) tv.min=a; else tv.min+=(a-tv.min)*0.02; if(a>tv.max) tv.max=a; else tv.max+=(a-tv.max)*0.02; const span=tv.max-tv.min; if(span<tv.min*0.25) return 0.75; const u=Math.max(0,Math.min(1,(a-tv.min)/span)); return 0.3+0.7*Math.pow(u,0.8); }
 let ac=null, M=null, proc=null, noiseB=null, capNode=null, capSink=null, sinkId='', interrupted=false, fxTL=true, lowCut=true;
 function ensureAudio(){ if(ac){ if(ac.state!=='running') ac.resume(); return ac; }
   ac=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'playback'}); noiseB=mkNoise(1);
@@ -495,7 +496,7 @@ function tone(semi,v,pn,pp,at){ pp=pp||PP(); const t=at||ac.currentTime, f=hz(ro
     harp:  {p:[[1,1,0,0],[2,0.6,0,0.35],[3,0.3,0,0.18],[4,0.15,0,0.1]],att:0.003,dur:1.3+v*0.8},
     chime: {p:[[1,1,0,0],[2.4,0.4,0,1.2],[3.1,0.25,0,0.9],[4.7,0.1,0,0.5]],att:0.005,dur:2.8+v},
     piron: {p:[[1,1,0,0],[2,0.1,0,0.45],[3,0.05,0,0.35],[0.5,0.07,0,0]],att:0.002,dur:0.75+v*0.55,hammer:true},   /* music-box ping from the reference: one clean partial, a whisper of 2nd/3rd, 0.5–1 s ring */
-    fuwa:  {p:[[1,1,-7,0],[1,0.85,7,0],[0.5,0.45,0,0],[2,0.22,-4,0],[2,0.22,4,0],[3,0.07,0,0]],att:0.7,dur:3.6+v*2,lp:650,wob:0.12,rel:2.6},   /* the soft bed under it: detuned pair + sub, dark lowpass, slow swell */
+    fuwa:  {p:[[1,1,-7,0],[1,0.85,7,0],[0.5,0.45,0,0],[2,0.22,-4,0],[2,0.22,4,0],[3,0.07,0,0]],att:0.28,dur:3.6+v*2,lp:650,wob:0.12,rel:1.6,soft:true},   /* the soft bed under it: detuned pair + sub, dark lowpass, slow swell */
     ep:    {p:[[1,1,0,0],[2,0.28,0,0.4],[4,0.14,0,0.7],[7,0.05,0,0.9]],att:0.004,dur:1.4+v*1.1,trem:true,tremRate:4.2,tremDepth:0.12},
     breath:{p:[[1,1,0,0],[1,0.4,5,0],[2,0.1,0,0]],att:0.9,dur:3+v*2},
     subbell:{p:[[0.5,1,0,0],[1,0.6,0,0],[2,0.2,0,0.8],[3,0.08,0,0.3]],att:0.01,dur:3.5+v*1.5},
@@ -507,7 +508,7 @@ function tone(semi,v,pn,pp,at){ pp=pp||PP(); const t=at||ac.currentTime, f=hz(ro
     organ:  {p:[[1,1,0,0],[2,0.6,0,0],[3,0.4,0,0],[4,0.3,0,0],[6,0.1,0,0]],att:0.03,dur:1.1+v*0.8,lp:3000,wob:0.15,trem:true},
     sub:    {p:[[0.5,1,0,0],[1,0.3,0,0],[2,0.05,0,0.3]],att:0.012,dur:1.2+v*0.8},
     vpiano: {p:[[1,1,0,0],[2,0.12+v*0.1,0,0.12],[3,0.05,0,0.06],[4,0.02,0,0.04],[5.1,0.012,0,0.03]],att:0.004,dur:Math.max(0.3,Math.min(4.2,4.6-((semi+pp.pitch+12)*0.11)))*(0.45+v*0.7),trem:true,tremRate:5.5+Math.random()*1.5,tremDepth:0.15,hammer:true} }[kind]||null;
-  const spec=V||{p:[[1,1,0,0]],att:0.01,dur:2}; const dur=spec.dur*dec()*pp.decay, life=pp.hold?90:dur+0.1, stoppers=[], att=Math.min(dur*0.8,spec.att*(pp.attMul||1)), out=gate(t,dur,pp,pn), g=ac.createGain(); const lvl=(kind==='pad'||kind==='breath'||kind==='choir'?0.22:kind==='fuwa'?0.46:kind==='revgtr'?0.16:kind==='vpiano'?0.28:kind==='ping'?0.34:kind==='piron'?0.3:0.26)*(kind==='vpiano'?0.25+v*0.75:0.4+v*0.6)*pp.level;
+  const spec=V||{p:[[1,1,0,0]],att:0.01,dur:2}; const dur=spec.dur*dec()*pp.decay, life=pp.hold?90:dur+0.1, stoppers=[], att=Math.min(dur*0.8,spec.att*(pp.attMul||1)), out=gate(t,dur,pp,pn), g=ac.createGain(); const lvl=(kind==='pad'||kind==='breath'||kind==='choir'?0.22:kind==='fuwa'?0.55:kind==='revgtr'?0.16:kind==='vpiano'?0.28:kind==='ping'?0.34:kind==='piron'?0.3:0.26)*(kind==='vpiano'?0.25+v*0.75:0.4+v*0.6)*pp.level;
   if(spec.rev){ g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(lvl,t+dur*0.9); g.gain.setValueAtTime(0,t+dur*0.9+0.004); }   // tape played backwards: swells up, then cuts
   else if(pp.hold){ g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(lvl,t+att); g.gain.setTargetAtTime(lvl*0.45,t+att,Math.max(0.25,dur*0.35)); }   // held: decays like the natural note at first, then settles on a sustain
   else { g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(lvl,t+att); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); }
@@ -518,10 +519,10 @@ function tone(semi,v,pn,pp,at){ pp=pp||PP(); const t=at||ac.currentTime, f=hz(ro
   if(spec.hammer){ const n=ac.createBufferSource(); n.buffer=noiseB; const bp=ac.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=Math.min(6000,f*4); bp.Q.value=1.2; const ng=ac.createGain(); ng.gain.setValueAtTime(0.12*(0.3+v),t); ng.gain.exponentialRampToValueAtTime(0.0001,t+0.012); n.connect(bp).connect(ng).connect(g); n.start(t); n.stop(t+0.03); }
   if(kind==='breath'){ const n=ac.createBufferSource(); n.buffer=noiseB; n.loop=true; const bp=ac.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=f*2; bp.Q.value=6; const ng=ac.createGain(); ng.gain.value=0.25; n.connect(bp).connect(ng).connect(g); n.start(t); n.stop(t+life+0.1); stoppers.push(n); }
   g.connect(out); revSend(g,1.4*pp.rev);
-  return (fade)=>{ const tt=ac.currentTime; g.gain.cancelScheduledValues(tt); g.gain.setValueAtTime(Math.max(0.0001,g.gain.value),tt);
+  return (fade)=>{ const tt=ac.currentTime; if(g.gain.cancelAndHoldAtTime) g.gain.cancelAndHoldAtTime(tt); else { const cur=g.gain.value; g.gain.cancelScheduledValues(tt); g.gain.setValueAtTime(Math.max(0.0001,cur),tt); }
     if(fade===undefined&&!pp.hold) return;   // an untouched release: let the note ring out
-    let rel=fade==='drag'?Math.max(0.06,Math.min(1.5,dur*0.3)):(fade||0.08); if(pp.hold&&fade===undefined){ const held=tt-t; rel=held<0.3?Math.max(0.3,dur-held):0.25+pp.decay*0.5; } if(spec.rel) rel*=spec.rel;   // a short tap keeps its natural ring; a real hold gets a release
-    g.gain.exponentialRampToValueAtTime(0.0001,tt+rel); if(pp.hold) for(const n of stoppers){ try{ n.stop(tt+rel+0.15); }catch(e){} } }; }
+    let rel=fade==='drag'?Math.max(0.06,Math.min(1.5,dur*0.3)):(fade||0.08); if(pp.hold&&fade===undefined){ const held=tt-t; rel=held<0.3?Math.max(0.3,dur-held):0.25+pp.decay*0.5; } if(spec.rel) rel*=spec.rel; if(spec.soft){ rel=Math.min(7,Math.max(rel,0.9)); } /* a slow-attack pad never gets cut off abruptly, even by a choke */   // a short tap keeps its natural ring; a real hold gets a release
+    let t0=tt; if(tt<t+att-0.005&&!spec.rev){ g.gain.exponentialRampToValueAtTime(lvl,t+att); t0=t+att; } /* released mid-attack: let the swell finish, then let go (a quick tap on a slow pad was silent otherwise) */ g.gain.exponentialRampToValueAtTime(0.0001,t0+rel); if(pp.hold) for(const n of stoppers){ try{ n.stop(t0+rel+0.15); }catch(e){} } }; }
 let bend=0; const bendable=new Set();
 function setBend(semi){ bend=semi; const t=ac.currentTime; for(const b of bendable) b.o.detune.setTargetAtTime(b.det+bend*100,t,0.02); }
 function swell(semi,v,pn,pp){ pp=pp||PP(); const t=ac.currentTime, f=hz(root()+12+semi+pp.pitch), g=ac.createGain(), out=gate(t,4,{...pp,reverse:false,cut:1},pn); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.22*(0.5+v*0.5)*pp.level,t+(0.18+0.3*(1-v))*(pp.attMul||1));
@@ -640,7 +641,7 @@ function chirp(v,pn,pp,at){ pp=pp||PP(); const t=at||ac.currentTime, o=ac.create
 const INSTR=[
   {id:'vpiano',name:'鍵盤',kind:'p',voice:'vpiano',m:{rev:0.35,bright:0.5}},
   {id:'ping',name:'ピン',kind:'p',voice:'ping',m:{rev:0.9,oct:1,dec:0.6,bright:0.5,att:0.5}},{id:'sparkle',name:'きらめき',kind:'p',voice:'sparkle',m:{rev:0.6,dec:0.5}},{id:'bed',name:'床コード',kind:'p',voice:'bed',m:{rev:0.45,bright:0.4,oct:0}},
-  {id:'piron',name:'オルゴール',kind:'p',voice:'piron',m:{rev:0.7,oct:1,dec:0.5,bright:0.4}},{id:'fuwa',name:'ふわ',kind:'p',voice:'fuwa',m:{rev:0.65,att:0.7,bright:0.35,oct:0,dec:0.6}},
+  {id:'piron',name:'オルゴール',kind:'p',voice:'piron',m:{rev:0.7,oct:1,dec:0.5,bright:0.4}},{id:'fuwa',name:'ふわ',kind:'p',voice:'fuwa',m:{rev:0.65,att:0.5,bright:0.45,oct:0,dec:0.6}},
   {id:'pluck',name:'Pluck',kind:'p',voice:'pluck'},{id:'piano',name:'Piano',kind:'p',voice:'piano'},{id:'ep',name:'エレピ',kind:'p',voice:'ep',m:{rev:0.4,bright:0.45}},{id:'bell',name:'Bell',kind:'p',voice:'bell'},
   {id:'revgtr',name:'逆ギター',kind:'p',voice:'revgtr',m:{bright:0.5,rev:0.7,att:0.5,spread:0.4}},{id:'tapeKeys',name:'テープ鍵盤',kind:'p',voice:'tapeKeys',m:{wob:0.35,bright:0.4}},{id:'organ',name:'VHSオルガン',kind:'p',voice:'organ',m:{wob:0.15}},{id:'bass',name:'ベース',kind:'p',voice:'bass',m:{oct:0}},{id:'robo',name:'ロボ',kind:'p',voice:'robo',m:{wob:0.2,bright:0.4,rev:0.35,dec:0.5}},
   {id:'drums',name:'ドラム',kind:'d',m:{rev:0.12,drive:0.25}},{id:'crackle',name:'接触不良',kind:'x',m:{rev:0.1,bright:0.5}},{id:'noise',name:'ノイズ',kind:'n'},{id:'grain',name:'粒',kind:'g',m:{rev:0.1,bright:0.7,wob:0,drive:0}} ];
@@ -793,8 +794,8 @@ gl.addEventListener('pointerdown',e=>{ ensureAudio(); gl.setPointerCapture(e.poi
   if(xr>=fxW()&&xr<OX()) return;
   if(xr<fxW()){ if(stripFx){ const st={fx:true,strip:true,k:null}; glPointers.set(e.pointerId,st); stripHold(st,y); return; } glPointers.set(e.pointerId,{fx:true}); glFx(xr,y); return; }
   if(randMode){ const st={fx:false,rand:true,rx:Math.max(0,x),ry:y,stop:null}; glPointers.set(e.pointerId,st); st.stop=watchHold(randStart(st)); return; }
-  if(isKbd()){ const sm=kbdSemi(Math.max(0,x),y), pn=(x/GWg()-0.5)*1.2*instr.mac.spread; const st={fx:false,kbd:true,sm,t:performance.now(),stop:null,lx:x,ly:y,last:null}; glPointers.set(e.pointerId,st); st.last=kbdNote(sm,0.75,pn,false); st.timer=setTimeout(()=>{ if(glPointers.get(e.pointerId)===st&&!st.stop) st.stop=watchHold(kbdHold(sm,0.7,pn)); },190); return; }
-  const c=Math.min(GC-1,Math.max(0,Math.floor(x/cellW()))), rr=GR-1-Math.min(GR-1,Math.floor(y/cellH())); const st={fx:false,c,rr,t:performance.now(),stop:null,lx:x,ly:y,last:null}; glPointers.set(e.pointerId,st); st.last=glNote(c,rr,0.75,true,false); st.timer=setTimeout(()=>{ if(glPointers.get(e.pointerId)===st&&!st.stop) st.stop=watchHold(glSwell(c,rr,0.7)); },190); });
+  if(isKbd()){ const sm=kbdSemi(Math.max(0,x),y), pn=(x/GWg()-0.5)*1.2*instr.mac.spread; const st={fx:false,kbd:true,sm,t:performance.now(),stop:null,lx:x,ly:y,last:null}; glPointers.set(e.pointerId,st); st.last=kbdNote(sm,touchVel(e),pn,false); st.timer=setTimeout(()=>{ if(glPointers.get(e.pointerId)===st&&!st.stop) st.stop=watchHold(kbdHold(sm,0.7,pn)); },190); return; }
+  const c=Math.min(GC-1,Math.max(0,Math.floor(x/cellW()))), rr=GR-1-Math.min(GR-1,Math.floor(y/cellH())); const st={fx:false,c,rr,t:performance.now(),stop:null,lx:x,ly:y,last:null}; glPointers.set(e.pointerId,st); st.last=glNote(c,rr,touchVel(e),true,false); st.timer=setTimeout(()=>{ if(glPointers.get(e.pointerId)===st&&!st.stop) st.stop=watchHold(glSwell(c,rr,0.7)); },190); });
 gl.addEventListener('pointermove',e=>{ const st=glPointers.get(e.pointerId); if(!st) return; const {x:xr,y}=glHit(e); const x=xr-OX(); if(st.strip){ stripHold(st,y); return; } if(st.fx){ glFx(xr,y); return; } if(st.rand){ st.rx=Math.max(0,Math.min(GWg(),x)); st.ry=y; return; }
   if(st.kbd){ const sm=kbdSemi(Math.max(0,Math.min(GWg()-1,x)),y); if(sm!==st.sm){ const pn=(x/GWg()-0.5)*1.2*instr.mac.spread; st.sm=sm; clearTimeout(st.timer); if(st.stop){ st.stop(); st.stop=null; } if(typeof st.last==='function') st.last('drag'); st.last=kbdNote(sm,0.6,pn,true); st.timer=setTimeout(()=>{ if(glPointers.get(e.pointerId)===st&&!st.stop) st.stop=watchHold(kbdHold(sm,0.7,pn)); },190); } return; }
   const c=Math.min(GC-1,Math.max(0,Math.floor(x/cellW()))), rr=GR-1-Math.min(GR-1,Math.max(0,Math.floor(y/cellH())));
@@ -807,6 +808,8 @@ gl.addEventListener('pointerup',glUp); gl.addEventListener('pointercancel',glUp)
 let glFxPos=null; function glFx(x,y){ const fx0=0; const u=Math.min(1,Math.max(0,(x-fx0)/fxW())), vv=Math.min(1,Math.max(0,1-y/GH)); glFxPos={u,vv}; setBend(Math.round((vv-0.5)*24)); glTone=u; if(M){ const t=ac.currentTime; const d=Math.max(instr.mac.drive,Math.max(0,u-0.5)*2); M.gdrive.curve=d<0.03?new Float32Array([-1,0,1]):satCurve(Math.pow(d,2)*0.9); M.glp.frequency.setTargetAtTime(600*Math.pow(25,u),t,0.03); } }
 $('#gl-scale').onclick=e=>{ glScale=glScale==='penta'?'minor':'penta'; e.target.textContent=glScale==='penta'?'ペンタ':'マイナー'; };
 document.querySelectorAll('#seg-view button').forEach(b=>b.onclick=()=>{ glKbd=b.dataset.view==='kbd'; document.querySelectorAll('#seg-view button').forEach(x=>x.classList.toggle('on',x===b)); });
+$('#b-tv').onclick=e=>{ tvOn=!tvOn; e.target.classList.toggle('on',tvOn); toast(tvOn?'指の当たる面積で強弱(軽く=小さく、押し込む=大きく)':'強弱オフ(いつも同じ音量)'); try{ localStorage.setItem('td_tv',tvOn?'1':'0'); }catch(x){} };
+$('#b-tv').classList.toggle('on',tvOn);
 $('#b-lowcut').onclick=e=>{ lowCut=!lowCut; e.target.classList.toggle('on',lowCut); if(M) M.mhp.frequency.setTargetAtTime(lowCut?85:28,ac.currentTime,0.05); toast(lowCut?'85Hz 以下をカット(小さなスピーカーで割れにくく)':'低音をそのまま出します(イヤホン/外部スピーカー向け)'); };
 $('#b-fxtl').onclick=e=>{ fxTL=!fxTL; e.target.classList.toggle('on',fxTL); if(!fxTL&&M) M.fxPairs.forEach(p=>p.home()); };
 document.querySelectorAll('#seg-strip button').forEach(b=>b.onclick=()=>{ stripFx=b.dataset.strip==='fx'; document.querySelectorAll('#seg-strip button').forEach(x=>x.classList.toggle('on',x===b)); stopAllHolds(); });
