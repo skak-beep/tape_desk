@@ -758,6 +758,7 @@ let phrStyle='normal';
 document.querySelectorAll('#phr-style button').forEach(b=>b.onclick=()=>{ phrStyle=b.dataset.ps; document.querySelectorAll('#phr-style button').forEach(x=>x.classList.toggle('on',x===b)); });
 function newPhrase(set,it){ const R=Math.random, pick=a=>a[Math.floor(R()*a.length)]; const pads=set.pads, n=pads.length, pitched=it&&it.kind==='p'; const S=phrStyle;
   const dens=S==='sparse'?0.12:S==='glitch'?0.5:S==='groove'?0.3:0.26, rows=pitched?Math.min(n,S==='sparse'?2:3+Math.floor(R()*2)):Math.max(1,Math.min(n,S==='sparse'?Math.floor(n*0.4):S==='groove'?4+Math.floor(R()*2):S==='glitch'?Math.ceil(n*0.6):Math.ceil(n*(0.5+R()*0.3))));
+  if(S==='sparse'){ return newPhraseSparse(set,it); }
   const use=new Set(); if(pitched){ /* rows are PENTA degrees: 0=root 1=m3 2=4th 3=5th 4=m7 5=oct… */ if(R()<0.75) use.add(0); if(R()<0.6) use.add(3%n); while(use.size<rows) use.add(Math.floor(R()*n)); } else { while(use.size<rows) use.add(Math.floor(R()*n)); }
   pads.forEach((p,i)=>{ p.pat.fill(0); p.ch=null; p.mult=1; if(!use.has(i)) return; const pat=new Uint8Array(16), ch=new Float32Array(16).fill(1);
     const kind=S==='groove'?pick(['even','even','bunched']):S==='glitch'?pick(['bunched','scatter']):S==='drift'?'scatter':pick(['scatter','even','bunched']);
@@ -770,6 +771,15 @@ function newPhrase(set,it){ const R=Math.random, pick=a=>a[Math.floor(R()*a.leng
     for(let k=0;k<16;k++) if(pat[k]) ch[k]=S==='drift'?0.45+R()*0.4:S==='glitch'?0.6+R()*0.4:k%4===0?1:0.75+R()*0.25;
     if(S==='drift'){ /* bars alternate: half the hits only every other loop */ }
     p.pat.set(pat); p.ch=ch; });
+  return;
+}
+function newPhraseSparse(set,it){ const R=Math.random, pads=set.pads, n=pads.length, pitched=it&&it.kind==='p';
+  { /* まばら = few notes, spread over rows and time, like drops. Budget 3–6 hits on 16 steps across 3–4 rows. */
+    pads.forEach(p=>{ p.pat.fill(0); p.ch=null; p.mult=1; });
+    const nRows=Math.min(n,3+Math.floor(R()*2)); const rowsU=new Set(); if(pitched&&R()<0.7) rowsU.add(0); while(rowsU.size<nRows) rowsU.add(Math.floor(R()*n)); const rl=[...rowsU];
+    const hits=3+Math.floor(R()*4); const steps=new Set(); while(steps.size<hits){ const k=Math.floor(R()*16); if(R()<0.35&&k%4!==0) continue; steps.add(k); }
+    let last=-1; for(const k of [...steps].sort((a,b)=>a-b)){ let r=rl[Math.floor(R()*rl.length)]; if(r===last&&rl.length>1) r=rl[(rl.indexOf(r)+1)%rl.length]; last=r; const p=pads[r]; p.pat[k]=1; if(!p.ch) p.ch=new Float32Array(16).fill(1); p.ch[k]=k%4===0?1:0.7+R()*0.3; }
+    return; }
   if(!pads.some(p=>p.pat.some(x=>x))){ const p=pads[0]; p.pat[0]=1; p.pat[8]=1; }
 }
 $('#b-phr').onclick=()=>{ ensureAudio(); const st=SETS[curSet]; if(!st) return; const it=INSTR.find(x=>x.id===curSet); if(curSet==='grain'&&!sample){ toast('先に「粒の素材」で録音かファイルを入れてください'); return; } newPhrase(st,it); renderGrid(); renderSeqTabs&&renderSeqTabs(); if(!seq.on) runSeq(true); toast((it?it.name:curSet)+' に新しいフレーズを撒きました(気に入ったら上の REC)'); };
