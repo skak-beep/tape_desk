@@ -232,8 +232,12 @@ body.rec #glide,body.rec #slicer,body.rec .grid{border-color:var(--rec);box-shad
       <span id="sel-name" class="lbl" style="display:none"></span>
     </div>
     <div class="row between" id="phr-row">
-      <div class="grp"><span class="cap">自動</span><button id="b-phr" class="primary">✦ 新フレーズ</button><span class="seg" id="phr-style"><button data-ps="normal" class="on">ふつう</button><button data-ps="sparse">まばら</button><button data-ps="groove">グルーヴ</button><button data-ps="glitch">グリッチ</button><button data-ps="drift">ずらす</button></span></div>
-      <span class="lbl" style="text-transform:none">この音源の行に撒き直す ・ 確率付きなのでループごとに少し変わる</span>
+      <div class="grp"><span class="cap">自動</span><button id="b-omk" class="primary">✦ おまかせ</button><button id="b-phr">✦ この音源</button><span class="seg" id="phr-style"><button data-ps="normal" class="on">ふつう</button><button data-ps="sparse">まばら</button><button data-ps="groove">グルーヴ</button><button data-ps="glitch">グリッチ</button><button data-ps="drift">ずらす</button></span></div>
+      <span class="lbl" style="text-transform:none">おまかせ = 鐘やマレット系を 2〜4 つ選んで一気に撒く ・ この音源 = 今のタブだけ撒き直す ・ 確率付きなのでループごとに少し変わる</span>
+    </div>
+    <div class="row between" id="keep-row">
+      <div class="grp"><span class="cap">キープ</span><span class="seg" id="keeps"><button data-kp="0">1</button><button data-kp="1">2</button><button data-kp="2">3</button><button data-kp="3">4</button></span></div>
+      <span class="lbl" style="text-transform:none">空きをタップ=今のフレーズを保存 ・ 保存済みをタップ=呼び出し ・ 長押し=上書き</span>
     </div>
     <div id="editor" class="editor" hidden>
       <div class="hd"><span id="ed-name">—</span><span><button id="ed-rev">逆再生</button><button id="ed-clean">Tape</button><button id="ed-reset">Reset</button><button id="ed-close">Close</button></span></div>
@@ -716,7 +720,7 @@ const gridEl=$('#grid'), padsEl=$('#pads'); const heldCells=new Set();
 const dbl=(el,fn)=>{ let t=0; el.addEventListener('pointerdown',e=>{ const n=performance.now(); if(n-t<380){ t=0; fn(e); } else t=n; }); };
 const MULTS=[0.25,0.5,1,2,4], multLabel=m=>m===0.25?'¼':m===0.5?'½':'×'+m;
 function build(){ document.body.dataset.mode=mode; if(typeof syncPlayBtn==='function') setTimeout(syncPlayBtn,0); document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('on',b.dataset.mode===mode)); INSTR.forEach(it=>{ if(it.kind==='p') SETS[it.id].pads.forEach((p,i)=>p.l=KEYS[(key+PENTA[i])%12]); });
-  const isGlide=mode==='glide', isDraw=mode==='draw', isStep=mode==='step'; $('#glide').hidden=!isGlide; $('#glide-wrap').hidden=!isGlide; $('#glide-row').hidden=!isGlide; $('#draw-wrap').hidden=!isDraw; gridEl.hidden=!isStep; $('#step-row').hidden=!isStep; $('#phr-row').hidden=!isStep; $('#step-hint').hidden=!isStep; padsEl.hidden=!isStep; if(!isStep){ $('#editor').hidden=true; } if(isGlide) requestAnimationFrame(glResize); if(typeof drMount==='function'){ drMount(); if(isDraw) drPalRender(); } if(isStep&&editMode) openEditor(selPad()); renderInstr();
+  const isGlide=mode==='glide', isDraw=mode==='draw', isStep=mode==='step'; $('#glide').hidden=!isGlide; $('#glide-wrap').hidden=!isGlide; $('#glide-row').hidden=!isGlide; $('#draw-wrap').hidden=!isDraw; gridEl.hidden=!isStep; $('#step-row').hidden=!isStep; $('#phr-row').hidden=!isStep; $('#keep-row').hidden=!isStep; $('#step-hint').hidden=!isStep; padsEl.hidden=!isStep; if(!isStep){ $('#editor').hidden=true; } if(isGlide) requestAnimationFrame(glResize); if(typeof drMount==='function'){ drMount(); if(isDraw) drPalRender(); } if(isStep&&editMode) openEditor(selPad()); renderInstr();
   gridEl.innerHTML=''; padsEl.innerHTML='';
   SETS[curSet].pads.forEach((p,i)=>{
     const rw=document.createElement('div'); rw.className='rw'; rw.innerHTML=`<div class="ms"><button class="m ${p.mute?'off':''}">◉</button><button class="s ${p.solo?'on':''}">S</button></div><div class="nm">${p.l}</div><div class="rt">${multLabel(p.mult)}</div><div class="cells">${Array.from({length:16},(_,k)=>`<div class="c ${k%4===0?'b4':''}" data-k="${k}"></div>`).join('')}</div>`;
@@ -783,6 +787,21 @@ function newPhraseSparse(set,it){ const R=Math.random, pads=set.pads, n=pads.len
   if(!pads.some(p=>p.pat.some(x=>x))){ const p=pads[0]; p.pat[0]=1; p.pat[8]=1; }
 }
 $('#b-phr').onclick=()=>{ ensureAudio(); const st=SETS[curSet]; if(!st) return; const it=INSTR.find(x=>x.id===curSet); if(curSet==='grain'&&!sample){ toast('先に「粒の素材」で録音かファイルを入れてください'); return; } newPhrase(st,it); renderGrid(); renderSeqTabs&&renderSeqTabs(); if(!seq.on) runSeq(true); toast((it?it.name:curSet)+' に新しいフレーズを撒きました(気に入ったら上の REC)'); };
+/* ✦ おまかせ — the whole kit at once: pick 2–4 instruments from the bell/mallet family, give each a style that suits it, scatter, run. Tap again for another draw; keep the good ones in the slots below. */
+const OMK=[['cbell','sparse',3],['marimba','normal',3],['vibes','sparse',2],['piron','sparse',2],['ping','sparse',1],['ep','normal',1],['vpiano','sparse',1],['fuwa','sparse',1]];
+function omakase(){ ensureAudio(); const R=Math.random; const bag=[]; OMK.forEach(o=>{ for(let i=0;i<o[2];i++) bag.push(o); }); const chosen=[]; const want=2+Math.floor(R()*3); let guard=0; while(chosen.length<want&&guard++<60){ const o=bag[Math.floor(R()*bag.length)]; if(!chosen.includes(o)) chosen.push(o); }
+  for(const st of Object.values(SETS)) st.pads.forEach(p=>{ p.pat.fill(0); p.ch=null; p.mult=1; });
+  const keepStyle=phrStyle; chosen.forEach(([id,style])=>{ phrStyle=style==='normal'&&R()<0.35?'groove':style; const it=INSTR.find(x=>x.id===id); if(it&&SETS[id]) newPhrase(SETS[id],it); }); phrStyle=keepStyle;
+  curSet=chosen[0][0]; selected={set:curSet,idx:0}; build(); if(!seq.on) runSeq(true); toast('おまかせ: '+chosen.map(([id])=>(INSTR.find(x=>x.id===id)||{}).name).join(' + ')+'  (もう一度で引き直し・下のキープで保存)'); }
+$('#b-omk').onclick=omakase;
+/* keeps: four slots holding the whole step state (every set's rows, chance, mute/solo, tempo, speed) */
+let keeps=(()=>{ try{ return JSON.parse(localStorage.getItem('td_keeps')||'[null,null,null,null]'); }catch(e){ return [null,null,null,null]; } })();
+function keepSnap(){ const sets={}; for(const [id,st] of Object.entries(SETS)){ const rows=st.pads.map(p=>({pat:Array.from(p.pat),ch:p.ch?Array.from(p.ch):null,mult:p.mult,mute:!!p.mute,solo:!!p.solo})); if(rows.some(r=>r.pat.some(x=>x))) sets[id]=rows; } return {sets,rate:P.rate,speed:P.speed||0,rev:P.rev,dark:P.dark,curSet,setms:Object.fromEntries(Object.entries(SETS).map(([id,st])=>[id,{mute:!!st.mute,solo:!!st.solo}]))}; }
+function keepLoad(k){ if(!k) return; for(const st of Object.values(SETS)) st.pads.forEach(p=>{ p.pat.fill(0); p.ch=null; p.mult=1; }); for(const [id,rows] of Object.entries(k.sets||{})){ const st=SETS[id]; if(!st) continue; rows.forEach((r,i)=>{ const p=st.pads[i]; if(!p) return; p.pat.set(r.pat.slice(0,16)); p.ch=r.ch?Float32Array.from(r.ch):null; p.mult=r.mult||1; p.mute=!!r.mute; p.solo=!!r.solo; }); } if(k.setms) for(const [id,m] of Object.entries(k.setms)){ if(SETS[id]){ SETS[id].mute=m.mute; SETS[id].solo=m.solo; } } if(k.rate) P.rate=k.rate; if(k.speed!==undefined) P.speed=k.speed; if(k.rev!==undefined) P.rev=k.rev; if(k.dark!==undefined) P.dark=k.dark; showKnobs(); applyKnobs(); if(k.curSet&&SETS[k.curSet]){ curSet=k.curSet; selected={set:curSet,idx:0}; } build(); }
+function keepsRender(){ document.querySelectorAll('#keeps button').forEach(b=>{ const i=+b.dataset.kp; b.classList.toggle('on',!!keeps[i]); b.textContent=keeps[i]?'●'+(i+1):String(i+1); }); }
+function keepSave(i){ keeps[i]=keepSnap(); try{ localStorage.setItem('td_keeps',JSON.stringify(keeps)); }catch(e){} keepsRender(); toast('キープ '+(i+1)+' に保存しました'); }
+document.querySelectorAll('#keeps button').forEach(b=>{ const i=+b.dataset.kp; let t0=0, held=false; b.addEventListener('pointerdown',()=>{ t0=performance.now(); held=false; b._lp=setTimeout(()=>{ held=true; keepSave(i); },600); }); const up=()=>{ clearTimeout(b._lp); }; b.addEventListener('pointerup',up); b.addEventListener('pointercancel',up); b.onclick=()=>{ if(held) return; if(!keeps[i]) keepSave(i); else { ensureAudio(); keepLoad(keeps[i]); toast('キープ '+(i+1)+' を呼び出しました'); if(!seq.on) runSeq(true); } }; });
+keepsRender();
 $('#b-clrset').onclick=()=>{ const st=SETS[curSet]; if(!st) return; st.pads.forEach(p=>{ p.pat.fill(0); p.ch=null; }); renderGrid(); const nm=(INSTR.find(x=>x.id===curSet)||{}).name||curSet; toast(nm+' のステップを全部消しました'); };
 $('#b-clrall').onclick=()=>{ for(const st of Object.values(SETS)){ st.mute=false; st.solo=false; st.pads.forEach(p=>{ p.pat.fill(0); p.mute=false; p.solo=false; }); } if(seq.on) runSeq(false); renderGrid(); toast('全セットのステップを消しました'); };
 
